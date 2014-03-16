@@ -19,7 +19,7 @@ class ExTwitter < Twitter::REST::Client
 
   def collect_with_cursor(collection=[], cursor=-1, &block)
     response = yield(cursor)
-    collection += response.attrs[:users]
+    collection += (response.attrs[:users] || response.attrs[:ids])
     next_cursor = response.attrs[:next_cursor]
     next_cursor == 0 ? collection.flatten : collect_with_cursor(collection, next_cursor, &block)
   end
@@ -92,6 +92,52 @@ class ExTwitter < Twitter::REST::Client
       end
     end
   end
+
+  def get_all_friend_ids(user=nil)
+    num_attempts = 0
+    collect_with_cursor do |cursor|
+      options = {count: 5000}
+      options[:cursor] = cursor unless cursor.nil?
+      begin
+        num_attempts += 1
+        friend_ids(user, options)
+      rescue Twitter::Error::TooManyRequests => e
+        if num_attempts <= MAX_ATTEMPTS
+          if WAIT
+            sleep e.rate_limit.reset_in
+          else
+            puts e.rate_limit.reset_in
+            raise
+          end
+        else
+          raise
+        end
+      end
+    end
+  end
+
+  def get_all_follower_ids(user=nil)
+    num_attempts = 0
+    collect_with_cursor do |cursor|
+      options = {count: 5000}
+      options[:cursor] = cursor unless cursor.nil?
+      begin
+        num_attempts += 1
+        follower_ids(user, options)
+      rescue Twitter::Error::TooManyRequests => e
+        if num_attempts <= MAX_ATTEMPTS
+          if WAIT
+            sleep e.rate_limit.reset_in
+          else
+            puts e.rate_limit.reset_in
+            raise
+          end
+        else
+          raise
+        end
+      end
+    end
+  end
 end
 
 if __FILE__ == $0
@@ -104,7 +150,7 @@ if __FILE__ == $0
   }
   client = ExTwitter.new(config)
   #puts client.friends.first.screen_name
-  puts "all #{client.get_all_followers.size}"
+  puts "all #{client.get_all_follower_ids.size}"
 end
 
 
