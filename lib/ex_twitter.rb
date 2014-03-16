@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 require 'twitter'
 require 'yaml'
+require 'active_support'
 
 # extended twitter
 class ExTwitter < Twitter::REST::Client
+  attr_accessor :cache
+
   def initialize(config={})
+    self.cache = ActiveSupport::Cache::FileStore.new(File.join(Dir::pwd, 'ex_twitter_cache'),
+      {expires_in: 3, race_condition_ttl: 3})
     super
   end
 
@@ -248,7 +253,9 @@ if __FILE__ == $0
   }
   client = ExTwitter.new(config)
   #puts client.friends.first.screen_name
-  puts "all #{client.get_all_follower_ids.size}"
+  puts client.cache.write('test', 111)
+  puts client.cache.read('test')
+  #puts "all #{client.get_all_follower_ids.size}"
 end
 
 

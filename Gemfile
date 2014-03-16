@@ -1,6 +1,7 @@
 source 'https://rubygems.org'
 
 gem 'twitter'
+gem 'activesupport'
 
 group :development do
   gem 'pry'
