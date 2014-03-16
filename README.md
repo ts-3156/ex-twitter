@@ -17,7 +17,9 @@ Add ex_twitter to your Gemfile, and bundle.
 
 ## Features
 
-aaa
+This gem is a thin wrapper of Twitter gem.  
+Twitter gem has twitter API like methods.  
+This gem has high functionality methods and don't raise exceptions.
 
 ## Examples
 
@@ -34,7 +36,4 @@ client.get_all_friends_ids
 # get all friends in parallel
 client.get_users(friend_ids)
 ```
-
-## What is this ?
-
 
