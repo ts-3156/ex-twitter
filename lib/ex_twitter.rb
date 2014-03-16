@@ -24,6 +24,39 @@ class ExTwitter < Twitter::REST::Client
     next_cursor == 0 ? collection.flatten : collect_with_cursor(collection, next_cursor, &block)
   end
 
+  def get_latest_200_tweets(user=nil)
+    num_attempts = 0
+    options = {count: 200, include_rts: true}
+    begin
+      num_attempts += 1
+      user_timeline(user, options)
+    rescue Twitter::Error::TooManyRequests => e
+      if num_attempts <= MAX_ATTEMPTS
+        if WAIT
+          sleep e.rate_limit.reset_in
+        else
+          puts "retry #{e.rate_limit.reset_in} minutes later"
+          []
+        end
+      else
+        puts "fail. num_attemps > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+        []
+      end
+    rescue => e
+      if num_attempts <= MAX_ATTEMPTS
+        if WAIT
+          sleep e.rate_limit.reset_in
+        else
+          puts "retry #{e.rate_limit.reset_in} minutes later"
+          []
+        end
+      else
+        puts "fail. num_attemps > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+        []
+      end
+    end
+  end
+
   def get_all_tweets(user=nil)
     num_attempts = 0
     collect_with_max_id do |max_id|
@@ -37,11 +70,24 @@ class ExTwitter < Twitter::REST::Client
           if WAIT
             sleep e.rate_limit.reset_in
           else
-            puts e.rate_limit.reset_in
-            raise
+            puts "retry #{e.rate_limit.reset_in} minutes later"
+            []
           end
         else
-          raise
+          puts "fail. num_attemps > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+          []
+        end
+      rescue => e
+        if num_attempts <= MAX_ATTEMPTS
+          if WAIT
+            sleep e.rate_limit.reset_in
+          else
+            puts "retry #{e.rate_limit.reset_in} minutes later"
+            []
+          end
+        else
+          puts "fail. num_attemps > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+          []
         end
       end
     end
@@ -60,11 +106,24 @@ class ExTwitter < Twitter::REST::Client
           if WAIT
             sleep e.rate_limit.reset_in
           else
-            puts e.rate_limit.reset_in
-            raise
+            puts "retry #{e.rate_limit.reset_in} minutes later"
+            []
           end
         else
-          raise
+          puts "fail. num_attemps > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+          []
+        end
+      rescue => e
+        if num_attempts <= MAX_ATTEMPTS
+          if WAIT
+            sleep e.rate_limit.reset_in
+          else
+            puts "retry #{e.rate_limit.reset_in} minutes later"
+            []
+          end
+        else
+          puts "fail. num_attemps > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+          []
         end
       end
     end
@@ -83,11 +142,24 @@ class ExTwitter < Twitter::REST::Client
           if WAIT
             sleep e.rate_limit.reset_in
           else
-            puts e.rate_limit.reset_in
-            raise
+            puts "retry #{e.rate_limit.reset_in} minutes later"
+            []
           end
         else
-          raise
+          puts "fail. num_attemps > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+          []
+        end
+      rescue => e
+        if num_attempts <= MAX_ATTEMPTS
+          if WAIT
+            sleep e.rate_limit.reset_in
+          else
+            puts "retry #{e.rate_limit.reset_in} minutes later"
+            []
+          end
+        else
+          puts "fail. num_attemps > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+          []
         end
       end
     end
@@ -106,11 +178,24 @@ class ExTwitter < Twitter::REST::Client
           if WAIT
             sleep e.rate_limit.reset_in
           else
-            puts e.rate_limit.reset_in
-            raise
+            puts "retry #{e.rate_limit.reset_in} minutes later"
+            []
           end
         else
-          raise
+          puts "fail. num_attemps > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+          []
+        end
+      rescue => e
+        if num_attempts <= MAX_ATTEMPTS
+          if WAIT
+            sleep e.rate_limit.reset_in
+          else
+            puts "retry #{e.rate_limit.reset_in} minutes later"
+            []
+          end
+        else
+          puts "fail. num_attemps > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+          []
         end
       end
     end
@@ -129,11 +214,24 @@ class ExTwitter < Twitter::REST::Client
           if WAIT
             sleep e.rate_limit.reset_in
           else
-            puts e.rate_limit.reset_in
-            raise
+            puts "retry #{e.rate_limit.reset_in} minutes later"
+            []
           end
         else
-          raise
+          puts "fail. num_attemps > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+          []
+        end
+      rescue => e
+        if num_attempts <= MAX_ATTEMPTS
+          if WAIT
+            sleep e.rate_limit.reset_in
+          else
+            puts "retry #{e.rate_limit.reset_in} minutes later"
+            []
+          end
+        else
+          puts "fail. num_attemps > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+          []
         end
       end
     end
