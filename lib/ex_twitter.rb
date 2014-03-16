@@ -147,9 +147,15 @@ class ExTwitter < Twitter::REST::Client
     collect_with_cursor do |cursor|
       options = {count: 200, include_user_entities: true}
       options[:cursor] = cursor unless cursor.nil?
+      cache_key = "#{self.class.name}:#{__callee__}:#{user}:#{options}"
+
+      cache = self.read(cache_key)
+      next cache unless cache.nil?
       begin
         num_attempts += 1
-        followers(user, options)
+        object = followers(user, options)
+        self.write(cache_key, object.attrs)
+        object.attrs
       rescue Twitter::Error::TooManyRequests => e
         if num_attempts <= MAX_ATTEMPTS
           if WAIT
@@ -179,9 +185,15 @@ class ExTwitter < Twitter::REST::Client
     collect_with_cursor do |cursor|
       options = {count: 5000}
       options[:cursor] = cursor unless cursor.nil?
+      cache_key = "#{self.class.name}:#{__callee__}:#{user}:#{options}"
+
+      cache = self.read(cache_key)
+      next cache unless cache.nil?
       begin
         num_attempts += 1
-        friend_ids(user, options)
+        object = friend_ids(user, options)
+        self.write(cache_key, object.attrs)
+        object.attrs
       rescue Twitter::Error::TooManyRequests => e
         if num_attempts <= MAX_ATTEMPTS
           if WAIT
@@ -211,9 +223,15 @@ class ExTwitter < Twitter::REST::Client
     collect_with_cursor do |cursor|
       options = {count: 5000}
       options[:cursor] = cursor unless cursor.nil?
+      cache_key = "#{self.class.name}:#{__callee__}:#{user}:#{options}"
+
+      cache = self.read(cache_key)
+      next cache unless cache.nil?
       begin
         num_attempts += 1
-        follower_ids(user, options)
+        object = follower_ids(user, options)
+        self.write(cache_key, object.attrs)
+        object.attrs
       rescue Twitter::Error::TooManyRequests => e
         if num_attempts <= MAX_ATTEMPTS
           if WAIT
