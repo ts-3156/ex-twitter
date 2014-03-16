@@ -20,3 +20,4 @@ doc/
 Gemfile.lock
 config.yml
 ex_twitter_cache
+.idea
