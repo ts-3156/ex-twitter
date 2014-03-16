@@ -2,6 +2,7 @@
 require 'twitter'
 require 'yaml'
 require 'active_support'
+require 'parallel'
 
 # extended twitter
 class ExTwitter < Twitter::REST::Client
@@ -255,6 +256,51 @@ class ExTwitter < Twitter::REST::Client
       end
     end
   end
+
+  def get_users(ids)
+    ids_per_worker = []
+    while(ids.size > 0)
+      ids_per_worker << ids.slice!(0, [100, ids.size].min)
+    end
+
+    num_attempts = 0
+    processed_users = []
+    Parallel.each_with_index(ids_per_worker, in_threads: ids_per_worker.size) do |ids, i|
+      cache_key = "#{self.class.name}:#{__callee__}:#{i}:#{ids}"
+      cache = self.read(cache_key)
+      if cache.nil?
+        begin
+          num_attempts += 1
+          object = {i: i, users: users(ids)}
+          self.write(cache_key, object)
+          processed_users << object
+        rescue Twitter::Error::TooManyRequests => e
+          if num_attempts <= MAX_ATTEMPTS
+            if WAIT
+              sleep e.rate_limit.reset_in
+              retry
+            else
+              puts "retry #{e.rate_limit.reset_in} minutes later"
+              {i: i, users: []}
+            end
+          else
+            puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+            {i: i, users: []}
+          end
+        rescue => e
+          if num_attempts <= MAX_ATTEMPTS
+            retry
+          else
+            puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
+            {i: i, users: []}
+          end
+        end
+      else
+        processed_users << cache
+      end
+    end
+    processed_users.sort_by{|p|p[:i]}.map{|p|p[:users]}.flatten
+  end
 end
 
 if __FILE__ == $0
@@ -268,7 +314,9 @@ if __FILE__ == $0
   }
   client = ExTwitter.new(config)
   #puts client.friends.first.screen_name
-  puts "all friends #{client.get_all_friends.size}"
+  ids = client.get_all_friend_ids
+  friends = client.get_users(ids)
+  puts friends.size
 end
 
 
