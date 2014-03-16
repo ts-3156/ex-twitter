@@ -3,6 +3,8 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.add_dependency 'twitter'
+  spec.add_dependency 'activesupport'
+  spec.add_dependency 'parallel'
   spec.add_development_dependency 'bundler'
   spec.authors = ['Shinohara Teruki']
   spec.description = %q(A wrapper to the Twitter gem.)
