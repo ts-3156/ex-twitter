@@ -8,9 +8,13 @@ require 'parallel'
 class ExTwitter < Twitter::REST::Client
   attr_accessor :cache
 
+  MAX_ATTEMPTS = 1
+  WAIT = false
+  CAcHE_EXPIRES_IN = 3
+
   def initialize(config={})
     self.cache = ActiveSupport::Cache::FileStore.new(File.join(Dir::pwd, 'ex_twitter_cache'),
-      {expires_in: 300, race_condition_ttl: 300})
+      {expires_in: CAcHE_EXPIRES_IN, race_condition_ttl: CAcHE_EXPIRES_IN})
     super
   end
 
@@ -28,20 +32,21 @@ class ExTwitter < Twitter::REST::Client
     false
   end
 
-  MAX_ATTEMPTS = 1
-  WAIT = false
-
   def collect_with_max_id(collection=[], max_id=nil, &block)
     response = yield(max_id)
-    collection += response
-    response.empty? ? collection.flatten : collect_with_max_id(collection, response.last.id - 1, &block)
+    return response unless response[1].nil?
+
+    collection += response[0]
+    response[0].empty? ? [collection.flatten, nil] : collect_with_max_id(collection, response[0].last.id - 1, &block)
   end
 
   def collect_with_cursor(collection=[], cursor=-1, &block)
     response = yield(cursor)
-    collection += (response[:users] || response[:ids])
-    next_cursor = response[:next_cursor]
-    next_cursor == 0 ? collection.flatten : collect_with_cursor(collection, next_cursor, &block)
+    return response unless response[1].nil?
+
+    collection += (response[0][:users] || response[0][:ids])
+    next_cursor = response[0][:next_cursor]
+    next_cursor == 0 ? [collection.flatten, nil] : collect_with_cursor(collection, next_cursor, &block)
   end
 
   def get_latest_200_tweets(user=nil)
@@ -49,26 +54,26 @@ class ExTwitter < Twitter::REST::Client
     options = {count: 200, include_rts: true}
     begin
       num_attempts += 1
-      user_timeline(user, options)
+      [user_timeline(user, options), nil]
     rescue Twitter::Error::TooManyRequests => e
       if num_attempts <= MAX_ATTEMPTS
         if WAIT
           sleep e.rate_limit.reset_in
           retry
         else
-          puts "retry #{e.rate_limit.reset_in} minutes later"
-          []
+          puts "retry #{e.rate_limit.reset_in} seconds later"
+          [[], e]
         end
       else
         puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
-        []
+        [[], e]
       end
     rescue => e
       if num_attempts <= MAX_ATTEMPTS
         retry
       else
         puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
-        []
+        [[], e]
       end
     end
   end
@@ -80,26 +85,26 @@ class ExTwitter < Twitter::REST::Client
       options[:max_id] = max_id unless max_id.nil?
       begin
         num_attempts += 1
-        user_timeline(user, options)
+        [user_timeline(user, options), nil]
       rescue Twitter::Error::TooManyRequests => e
         if num_attempts <= MAX_ATTEMPTS
           if WAIT
             sleep e.rate_limit.reset_in
             retry
           else
-            puts "retry #{e.rate_limit.reset_in} minutes later"
-            []
+            puts "retry #{e.rate_limit.reset_in} seconds later"
+            [[], e]
           end
         else
           puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
-          []
+          [[], e]
         end
       rescue => e
         if num_attempts <= MAX_ATTEMPTS
           retry
         else
           puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
-          []
+          [[], e]
         end
       end
     end
@@ -113,31 +118,31 @@ class ExTwitter < Twitter::REST::Client
       cache_key = "#{self.class.name}:#{__callee__}:#{user}:#{options}"
 
       cache = self.read(cache_key)
-      next cache unless cache.nil?
+      next [cache, nil] unless cache.nil?
       begin
         num_attempts += 1
         object = friends(user, options)
         self.write(cache_key, object.attrs)
-        object.attrs
+        [object.attrs, nil]
       rescue Twitter::Error::TooManyRequests => e
         if num_attempts <= MAX_ATTEMPTS
           if WAIT
             sleep e.rate_limit.reset_in
             retry
           else
-            puts "retry #{e.rate_limit.reset_in} minutes later"
-            []
+            puts "retry #{e.rate_limit.reset_in} seconds later"
+            [{}, e]
           end
         else
           puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
-          []
+          [{}, e]
         end
       rescue => e
         if num_attempts <= MAX_ATTEMPTS
           retry
         else
           puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
-          []
+          [{}, e]
         end
       end
     end
@@ -151,31 +156,31 @@ class ExTwitter < Twitter::REST::Client
       cache_key = "#{self.class.name}:#{__callee__}:#{user}:#{options}"
 
       cache = self.read(cache_key)
-      next cache unless cache.nil?
+      next [cache, nil] unless cache.nil?
       begin
         num_attempts += 1
         object = followers(user, options)
         self.write(cache_key, object.attrs)
-        object.attrs
+        [object.attrs, nil]
       rescue Twitter::Error::TooManyRequests => e
         if num_attempts <= MAX_ATTEMPTS
           if WAIT
             sleep e.rate_limit.reset_in
             retry
           else
-            puts "retry #{e.rate_limit.reset_in} minutes later"
-            []
+            puts "retry #{e.rate_limit.reset_in} seconds later"
+            [{}, e]
           end
         else
           puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
-          []
+          [{}, e]
         end
       rescue => e
         if num_attempts <= MAX_ATTEMPTS
           retry
         else
           puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
-          []
+          [{}, e]
         end
       end
     end
@@ -201,7 +206,7 @@ class ExTwitter < Twitter::REST::Client
             sleep e.rate_limit.reset_in
             retry
           else
-            puts "retry #{e.rate_limit.reset_in} minutes later"
+            puts "retry #{e.rate_limit.reset_in} seconds later"
             []
           end
         else
@@ -239,7 +244,7 @@ class ExTwitter < Twitter::REST::Client
             sleep e.rate_limit.reset_in
             retry
           else
-            puts "retry #{e.rate_limit.reset_in} minutes later"
+            puts "retry #{e.rate_limit.reset_in} seconds later"
             []
           end
         else
@@ -280,7 +285,7 @@ class ExTwitter < Twitter::REST::Client
               sleep e.rate_limit.reset_in
               retry
             else
-              puts "retry #{e.rate_limit.reset_in} minutes later"
+              puts "retry #{e.rate_limit.reset_in} seconds later"
               {i: i, users: []}
             end
           else
@@ -313,10 +318,8 @@ if __FILE__ == $0
     access_token_secret: yml_config['access_token_secret']
   }
   client = ExTwitter.new(config)
-  #puts client.friends.first.screen_name
-  ids = client.get_all_friend_ids
-  friends = client.get_users(ids)
-  puts friends.size
+  followers, error = client.get_all_followers
+  puts "#{followers.size} #{error.inspect}"
 end
 
 
