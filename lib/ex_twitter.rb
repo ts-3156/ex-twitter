@@ -194,12 +194,12 @@ class ExTwitter < Twitter::REST::Client
       cache_key = "#{self.class.name}:#{__callee__}:#{user}:#{options}"
 
       cache = self.read(cache_key)
-      next cache unless cache.nil?
+      next [cache, nil] unless cache.nil?
       begin
         num_attempts += 1
         object = friend_ids(user, options)
         self.write(cache_key, object.attrs)
-        object.attrs
+        [object.attrs, nil]
       rescue Twitter::Error::TooManyRequests => e
         if num_attempts <= MAX_ATTEMPTS
           if WAIT
@@ -207,18 +207,18 @@ class ExTwitter < Twitter::REST::Client
             retry
           else
             puts "retry #{e.rate_limit.reset_in} seconds later"
-            []
+            [{}, e]
           end
         else
           puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
-          []
+          [{}, e]
         end
       rescue => e
         if num_attempts <= MAX_ATTEMPTS
           retry
         else
           puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
-          []
+          [{}, e]
         end
       end
     end
@@ -232,12 +232,12 @@ class ExTwitter < Twitter::REST::Client
       cache_key = "#{self.class.name}:#{__callee__}:#{user}:#{options}"
 
       cache = self.read(cache_key)
-      next cache unless cache.nil?
+      next [cache, nil] unless cache.nil?
       begin
         num_attempts += 1
         object = follower_ids(user, options)
         self.write(cache_key, object.attrs)
-        object.attrs
+        [object.attrs, nil]
       rescue Twitter::Error::TooManyRequests => e
         if num_attempts <= MAX_ATTEMPTS
           if WAIT
@@ -245,18 +245,18 @@ class ExTwitter < Twitter::REST::Client
             retry
           else
             puts "retry #{e.rate_limit.reset_in} seconds later"
-            []
+            [{}, e]
           end
         else
           puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
-          []
+          [{}, e]
         end
       rescue => e
         if num_attempts <= MAX_ATTEMPTS
           retry
         else
           puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
-          []
+          [{}, e]
         end
       end
     end
@@ -286,24 +286,25 @@ class ExTwitter < Twitter::REST::Client
               retry
             else
               puts "retry #{e.rate_limit.reset_in} seconds later"
-              {i: i, users: []}
+              {i: i, users: [], e}
             end
           else
             puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
-            {i: i, users: []}
+            {i: i, users: [], e}
           end
         rescue => e
           if num_attempts <= MAX_ATTEMPTS
             retry
           else
             puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
-            {i: i, users: []}
+            {i: i, users: [], e}
           end
         end
       else
         processed_users << cache
       end
     end
+    # TODO remove if users have error, or raise
     processed_users.sort_by{|p|p[:i]}.map{|p|p[:users]}.flatten
   end
 end
