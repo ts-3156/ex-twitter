@@ -9,8 +9,22 @@ class ExTwitter < Twitter::REST::Client
 
   def initialize(config={})
     self.cache = ActiveSupport::Cache::FileStore.new(File.join(Dir::pwd, 'ex_twitter_cache'),
-      {expires_in: 3, race_condition_ttl: 3})
+      {expires_in: 300, race_condition_ttl: 300})
     super
+  end
+
+  def read(key)
+    self.cache.read(key)
+  rescue => e
+    puts "in read #{key} #{e.inspect}"
+    nil
+  end
+
+  def write(key, value)
+    self.cache.write(key, value)
+  rescue => e
+    puts "in write #{key} #{value} #{e.inspect}"
+    false
   end
 
   MAX_ATTEMPTS = 1
@@ -24,8 +38,8 @@ class ExTwitter < Twitter::REST::Client
 
   def collect_with_cursor(collection=[], cursor=-1, &block)
     response = yield(cursor)
-    collection += (response.attrs[:users] || response.attrs[:ids])
-    next_cursor = response.attrs[:next_cursor]
+    collection += (response[:users] || response[:ids])
+    next_cursor = response[:next_cursor]
     next_cursor == 0 ? collection.flatten : collect_with_cursor(collection, next_cursor, &block)
   end
 
@@ -95,9 +109,15 @@ class ExTwitter < Twitter::REST::Client
     collect_with_cursor do |cursor|
       options = {count: 200, include_user_entities: true}
       options[:cursor] = cursor unless cursor.nil?
+      cache_key = "#{self.class.name}:#{__callee__}:#{user}:#{options}"
+
+      cache = self.read(cache_key)
+      next cache unless cache.nil?
       begin
         num_attempts += 1
-        friends(user, options)
+        object = friends(user, options)
+        self.write(cache_key, object.attrs)
+        object.attrs
       rescue Twitter::Error::TooManyRequests => e
         if num_attempts <= MAX_ATTEMPTS
           if WAIT
@@ -220,6 +240,7 @@ class ExTwitter < Twitter::REST::Client
 end
 
 if __FILE__ == $0
+  puts '--start--'
   yml_config = YAML.load_file('config.yml')
   config = {
     consumer_key: yml_config['consumer_key'],
@@ -229,9 +250,7 @@ if __FILE__ == $0
   }
   client = ExTwitter.new(config)
   #puts client.friends.first.screen_name
-  puts client.cache.write('test', 111)
-  puts client.cache.read('test')
-  #puts "all #{client.get_all_follower_ids.size}"
+  puts "all friends #{client.get_all_friends.size}"
 end
 
 
