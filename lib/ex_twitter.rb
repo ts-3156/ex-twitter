@@ -6,15 +6,16 @@ require 'parallel'
 
 # extended twitter
 class ExTwitter < Twitter::REST::Client
-  attr_accessor :cache
+  attr_accessor :cache, :cache_expires_in
 
   MAX_ATTEMPTS = 1
   WAIT = false
-  CAcHE_EXPIRES_IN = 3
+  CACHE_EXPIRES_IN = 300
 
   def initialize(config={})
+    self.cache_expires_in = (config[:cache_expires_in] || CACHE_EXPIRES_IN)
     self.cache = ActiveSupport::Cache::FileStore.new(File.join(Dir::pwd, 'ex_twitter_cache'),
-      {expires_in: CAcHE_EXPIRES_IN, race_condition_ttl: CAcHE_EXPIRES_IN})
+      {expires_in: self.cache_expires_in, race_condition_ttl: self.cache_expires_in})
     super
   end
 
@@ -308,6 +309,8 @@ class ExTwitter < Twitter::REST::Client
     processed_users.sort_by{|p|p[:i]}.map{|p|p[:users]}.flatten
   end
 
+  # mentions_timeline is to fetch the timeline of Tweets mentioning the authenticated user
+  # get_mentions is to fetch the Tweets mentioning the screen_name's user
   def get_mentions(screen_name)
     search_tweets("to:#{screen_name}", {result_type: 'recent', count: 100})
   end
