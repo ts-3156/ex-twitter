@@ -286,18 +286,18 @@ class ExTwitter < Twitter::REST::Client
               retry
             else
               puts "retry #{e.rate_limit.reset_in} seconds later"
-              {i: i, users: [], e}
+              {i: i, users: [], e: e}
             end
           else
             puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
-            {i: i, users: [], e}
+            {i: i, users: [], e: e}
           end
         rescue => e
           if num_attempts <= MAX_ATTEMPTS
             retry
           else
             puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
-            {i: i, users: [], e}
+            {i: i, users: [], e: e}
           end
         end
       else
@@ -306,6 +306,47 @@ class ExTwitter < Twitter::REST::Client
     end
     # TODO remove if users have error, or raise
     processed_users.sort_by{|p|p[:i]}.map{|p|p[:users]}.flatten
+  end
+
+  def get_mentions(screen_name)
+    search_tweets("to:#{screen_name}", {result_type: 'recent', count: 100})
+  end
+
+  def search_japanese_tweets(str)
+    search_tweets(str, {result_type: 'recent', count: 100, lang: 'ja'})
+  end
+
+  def search_tweets_except_rt(str)
+    search_tweets("#{str} -rt", {result_type: 'recent', count: 100})
+  end
+
+  def search_tweets(str, options)
+    num_attempts = 0
+    begin
+      num_attempts += 1
+      result = search(str, options)
+      [result.take(100), nil]
+    rescue Twitter::Error::TooManyRequests => e
+      if num_attempts <= MAX_ATTEMPTS
+        if WAIT
+          sleep e.rate_limit.reset_in
+          retry
+        else
+          puts "retry #{e.rate_limit.reset_in} seconds later"
+          [[], e]
+        end
+      else
+        puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+        [[], e]
+      end
+    rescue => e
+      if num_attempts <= MAX_ATTEMPTS
+        retry
+      else
+        puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
+        [[], e]
+      end
+    end
   end
 end
 
@@ -319,8 +360,11 @@ if __FILE__ == $0
     access_token_secret: yml_config['access_token_secret']
   }
   client = ExTwitter.new(config)
-  followers, error = client.get_all_followers
-  puts "#{followers.size} #{error.inspect}"
+  #followers, error = client.get_all_followers
+  #puts "#{followers.size} #{error.inspect}"
+  tweets, error = client.search_japanese_tweets('りんご')
+  puts tweets.size
+  puts tweets.map{|t|t.text}
 end
 
 
