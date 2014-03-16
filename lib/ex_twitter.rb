@@ -8,19 +8,31 @@ class ExTwitter < Twitter::REST::Client
     super
   end
 
-def collect_with_max_id(collection=[], max_id=nil, &block)
-  response = yield(max_id)
-  collection += response
-  response.empty? ? collection.flatten : collect_with_max_id(collection, response.last.id - 1, &block)
-end
+  MAX_ATTEMPTS = 3
 
-def get_all_tweets(user)
-  collect_with_max_id do |max_id|
-    options = {count: 200, include_rts: true}
-    options[:max_id] = max_id unless max_id.nil?
-    user_timeline(user, options)
+  def collect_with_max_id(collection=[], max_id=nil, &block)
+    response = yield(max_id)
+    collection += response
+    response.empty? ? collection.flatten : collect_with_max_id(collection, response.last.id - 1, &block)
   end
-end
+
+  def get_all_tweets(user)
+    num_attempts = 0
+    collect_with_max_id do |max_id|
+      options = {count: 200, include_rts: true}
+      options[:max_id] = max_id unless max_id.nil?
+      begin
+        num_attempts += 1
+        user_timeline(user, options)
+      rescue Twitter::Error::TooManyRequests => e
+        if num_attempts <= MAX_ATTEMPTS
+          sleep e.rate_limit.reset_in
+        else
+          raise
+        end
+      end
+    end
+  end
 end
 
 if __FILE__ == $0
