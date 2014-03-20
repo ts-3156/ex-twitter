@@ -6,13 +6,15 @@ require 'parallel'
 
 # extended twitter
 class ExTwitter < Twitter::REST::Client
-  attr_accessor :cache, :cache_expires_in
+  attr_accessor :cache, :cache_expires_in, :max_attempts, :wait
 
   MAX_ATTEMPTS = 1
   WAIT = false
   CACHE_EXPIRES_IN = 300
 
   def initialize(config={})
+    self.max_attempts = (config[:max_attempts] || MAX_ATTEMPTS)
+    self.wait = (config[:wait] || WAIT)
     self.cache_expires_in = (config[:cache_expires_in] || CACHE_EXPIRES_IN)
     self.cache = ActiveSupport::Cache::FileStore.new(File.join(Dir::pwd, 'ex_twitter_cache'),
       {expires_in: self.cache_expires_in, race_condition_ttl: self.cache_expires_in})
@@ -365,9 +367,15 @@ if __FILE__ == $0
   client = ExTwitter.new(config)
   #followers, error = client.get_all_followers
   #puts "#{followers.size} #{error.inspect}"
-  tweets, error = client.search_japanese_tweets('りんご')
-  puts tweets.size
-  puts tweets.map{|t|t.text}
+  # tweets, error = client.search_japanese_tweets('りんご')
+  tweets, error = client.search_tweets_except_rt('#りんご')
+  # puts tweets.size
+  tweets.each do |t|
+    next if !t.media?
+    puts t.text
+    puts t.media[0].attrs
+    puts '----'
+  end
 end
 
 
