@@ -12,7 +12,26 @@ class ExTwitter < Twitter::REST::Client
   WAIT = false
   CACHE_EXPIRES_IN = 300
 
+  def self.get_config_value(config)
+    return {} if config.nil?
+    {
+      consumer_key: config['consumer_key'],
+      consumer_secret: config['consumer_secret'],
+      access_token: config['access_token'],
+      access_token_secret: config['access_token_secret']
+    }
+  end
+
   def initialize(config={})
+    if config.empty?
+      yml_config = if File.exists?(File.expand_path('./', 'config.yml'))
+        YAML.load_file('config.yml')
+      elsif File.exists?(File.expand_path('./config/', 'config.yml'))
+        YAML.load_file('config/config.yml')
+      end
+      config = self.class.get_config_value(yml_config)
+    end
+
     self.max_attempts = (config[:max_attempts] || MAX_ATTEMPTS)
     self.wait = (config[:wait] || WAIT)
     self.cache_expires_in = (config[:cache_expires_in] || CACHE_EXPIRES_IN)
@@ -357,25 +376,21 @@ end
 
 if __FILE__ == $0
   puts '--start--'
-  yml_config = YAML.load_file('config.yml')
-  config = {
-    consumer_key: yml_config['consumer_key'],
-    consumer_secret: yml_config['consumer_secret'],
-    access_token: yml_config['access_token'],
-    access_token_secret: yml_config['access_token_secret']
-  }
-  client = ExTwitter.new(config)
+  client = ExTwitter.new
+  puts client.get_all_friends.size
   #followers, error = client.get_all_followers
   #puts "#{followers.size} #{error.inspect}"
   # tweets, error = client.search_japanese_tweets('りんご')
-  tweets, error = client.search_tweets_except_rt('#りんご')
+  # tweets, error = client.search_tweets_except_rt('#りんご')
   # puts tweets.size
+=begin
   tweets.each do |t|
     next if !t.media?
     puts t.text
     puts t.media[0].attrs
     puts '----'
   end
+=end
 end
 
 
