@@ -60,5 +60,46 @@ describe ExTwitter do
       pending 'returns the all tweets posted by the user specified by screen name or user id' do
       end
     end
+
+    context 'without a screen name passed' do
+      before(:each) do
+      end
+
+      pending 'requests the correct resources' do
+      end
+
+      pending 'returns Array of Twitter::Tweet' do
+      end
+
+      pending 'returns the all tweets posted by the auth user' do
+      end
+    end
+  end
+
+  describe '#get_all_friends' do
+    context 'with a screen name passed' do
+      before(:each) do
+      end
+
+      pending 'requests the correct resources' do
+      end
+
+      pending 'returns the all tweets posted by the user specified by screen name or user id' do
+      end
+    end
+    
+    context 'without a screen name passed' do
+      before(:each) do
+      end
+
+      pending 'requests the correct resources' do
+      end
+
+      pending 'returns Array of Twitter::User' do
+      end
+
+      pending 'returns the all tweets posted by the auth user' do
+      end
+    end
   end
 end
