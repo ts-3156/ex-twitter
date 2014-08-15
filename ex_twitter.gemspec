@@ -5,7 +5,11 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'twitter'
   spec.add_dependency 'activesupport'
   spec.add_dependency 'parallel'
+
   spec.add_development_dependency 'bundler'
+  spec.add_development_dependency 'pry'
+  spec.add_development_dependency 'webmock'
+
   spec.authors = ['Shinohara Teruki']
   spec.description = %q(A wrapper to the Twitter gem.)
   spec.email = %w[ts_3156@yahoo.co.jp]
