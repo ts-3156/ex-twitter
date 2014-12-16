@@ -1,12 +1,12 @@
-# -*- coding: utf-8 -*-
 require 'twitter'
 require 'yaml'
 require 'active_support'
 require 'parallel'
+require 'logger'
 
 # extended twitter
 class ExTwitter < Twitter::REST::Client
-  attr_accessor :cache, :cache_expires_in, :max_attempts, :wait, :auto_paginate
+  attr_accessor :cache, :cache_expires_in, :max_attempts, :wait, :auto_paginate, :logger
 
   MAX_ATTEMPTS = 1
   WAIT = false
@@ -38,20 +38,23 @@ class ExTwitter < Twitter::REST::Client
     self.cache_expires_in = (config[:cache_expires_in] || CACHE_EXPIRES_IN)
     self.cache = ActiveSupport::Cache::FileStore.new(File.join(Dir::pwd, 'ex_twitter_cache'),
       {expires_in: self.cache_expires_in, race_condition_ttl: self.cache_expires_in})
+
+    self.logger = Logger.new(STDOUT)
+    self.logger.level = Logger::DEBUG
     super
   end
 
   def read(key)
     self.cache.read(key)
   rescue => e
-    puts "in read #{key} #{e.inspect}"
+    logger.warn "in read #{key} #{e.inspect}"
     nil
   end
 
   def write(key, value)
     self.cache.write(key, value)
   rescue => e
-    puts "in write #{key} #{value} #{e.inspect}"
+    logger.warn "in write #{key} #{value} #{e.inspect}"
     false
   end
 
@@ -69,10 +72,11 @@ class ExTwitter < Twitter::REST::Client
   #
   # twitterで再帰方式がとられている理由は、おそらく、一般ユーザー向けのサンプルでメソッド名を渡すようなリフレクションを避けるため、
   # なのかもしれない。
-  def collect_with_max_id(method_name, args, &block)
-    options = args.pop
+  def collect_with_max_id(method_name, *args, &block)
+    options = args.last.is_a?(Hash) ? args.pop : {}
     max_calls = options.delete(:max_calls) || 3
     data = last_response = send(method_name, *args, options)
+    logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
 
     if auto_paginate
       (max_calls - 1).times do
@@ -80,6 +84,8 @@ class ExTwitter < Twitter::REST::Client
 
         options[:max_id] = last_response.last.id - 1
         last_response = send(method_name, *args, options)
+        logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
+
         if block_given?
           yield(data, last_response)
         else
@@ -91,10 +97,11 @@ class ExTwitter < Twitter::REST::Client
     data
   end
 
-  def collect_with_cursor(method_name, args, &block)
-    options = args.pop
+  def collect_with_cursor(method_name, *args, &block)
+    options = args.last.is_a?(Hash) ? args.pop : {}
     max_calls = options.delete(:max_calls) || 3
     last_response = send(method_name, *args, options).attrs
+    logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
     data = last_response[:users] || last_response[:ids]
 
     if auto_paginate
@@ -104,6 +111,8 @@ class ExTwitter < Twitter::REST::Client
 
         options[:cursor] = next_cursor
         last_response = send(method_name, *args, options).attrs
+        logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
+
         if block_given?
           yield(data, last_response)
         else
@@ -117,42 +126,42 @@ class ExTwitter < Twitter::REST::Client
   end
 
   alias :old_user_timeline :user_timeline
-  def user_timeline(user = nil)
-    options = {count: 200, include_rts: true}
-    collect_with_max_id(:old_user_timeline, [user, options])
+  def user_timeline(user = nil, options = {})
+    options = options.merge({count: 200, include_rts: true})
+    collect_with_max_id(:old_user_timeline, user, options)
   end
 
   alias :old_friends :friends
-  def friends(user = nil)
-    options = {count: 200, include_user_entities: true}
-    collect_with_cursor(:old_friends, [user, options])
+  def friends(user = nil, options = {})
+    options = options.merge({count: 200, include_user_entities: true})
+    collect_with_cursor(:old_friends, user, options)
   end
 
   alias :old_followers :followers
-  def followers(user = nil)
-    options = {count: 200, include_user_entities: true}
-    collect_with_cursor(:old_followers, [user, options])
+  def followers(user = nil, options = {})
+    options = options.merge({count: 200, include_user_entities: true})
+    collect_with_cursor(:old_followers, user, options)
   end
 
   alias :old_friend_ids :friend_ids
-  def friend_ids(user = nil)
-    options = {count: 5000}
-    collect_with_cursor(:old_friend_ids, [user, options])
+  def friend_ids(user = nil, options = {})
+    options = options.merge({count: 5000})
+    collect_with_cursor(:old_friend_ids, user, options)
   end
 
   alias :old_follower_ids :follower_ids
-  def follower_ids(user = nil)
-    options = {count: 5000}
-    collect_with_cursor(:old_follower_ids, [user, options])
+  def follower_ids(user = nil, options = {})
+    options = options.merge({count: 5000})
+    collect_with_cursor(:old_follower_ids, user, options)
   end
 
   alias :old_users :users
-  def users(ids)
+  def users(ids, options = {})
     ids_per_worker = ids.each_slice(100).to_a
     processed_users = []
 
     Parallel.each_with_index(ids_per_worker, in_threads: ids_per_worker.size) do |ids, i|
-      _users = {i: i, users: old_users(ids)}
+      _users = {i: i, users: old_users(ids, options)}
       processed_users << _users
     end
 
