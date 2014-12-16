@@ -1,105 +1,70 @@
-# coding: utf-8
 require 'helper'
 
 describe ExTwitter do
-  before(:each) do
-    config = {
+  let(:config) {
+    {
       consumer_key: 'CK',
       consumer_secret: 'CS',
       access_token: 'AT',
       access_token_secret: 'ATS'
     }
-    @client = ExTwitter.new(config)
-  end
+  }
+  let(:client) { ExTwitter.new(config) }
 
   describe '#initialize' do
-    context 'with all values passed' do
-      pending 'set max_attempts' do
-      end
+  end
 
-      pending 'set wait' do
-      end
+  describe '#read' do
+  end
 
-      pending 'set cache' do
-      end
+  describe '#write' do
+  end
 
-      pending 'set cache_expires_in' do
-      end
+  describe '#collect_with_max_id' do
+  end
+
+  describe '#collect_with_cursor' do
+  end
+
+  describe '#user_timeline' do
+    it 'call collect_with_max_id' do
+      expect(client).to receive(:collect_with_max_id)
+      client.user_timeline
     end
   end
 
-  describe '#read, #write' do
-    pending 'read cache' do
-    end
-
-    pending 'write cache' do
-    end
-  end
-
-  describe '#collect_with_max_id, #collect_with_cursor' do
-    pending 'collects with max id' do
-    end
-
-    pending 'collects with cursor' do
+  describe '#friends' do
+    it 'call collect_with_cursor' do
+      expect(client).to receive(:collect_with_cursor)
+      client.friends
     end
   end
 
-  describe '#get_latest_200_tweets' do
-    pending 'gets latest 200 tweets' do
+  describe '#followers' do
+    it 'call collect_with_cursor' do
+      expect(client).to receive(:collect_with_cursor)
+      client.followers
     end
   end
 
-  describe '#get_all_tweets' do
-    context 'with a screen name passed' do
-      before(:each) do
-      end
-
-      pending 'requests the correct resources' do
-      end
-
-      pending 'returns the all tweets posted by the user specified by screen name or user id' do
-      end
-    end
-
-    context 'without a screen name passed' do
-      before(:each) do
-      end
-
-      pending 'requests the correct resources' do
-      end
-
-      pending 'returns Array of Twitter::Tweet' do
-      end
-
-      pending 'returns the all tweets posted by the auth user' do
-      end
+  describe '#friend_ids' do
+    it 'call collect_with_cursor' do
+      expect(client).to receive(:collect_with_cursor)
+      client.friend_ids
     end
   end
 
-  describe '#get_all_friends' do
-    context 'with a screen name passed' do
-      before(:each) do
-      end
-
-      pending 'requests the correct resources' do
-      end
-
-      pending 'returns the all tweets posted by the user specified by screen name or user id' do
-      end
+  describe '#follower_ids' do
+    it 'call collect_with_cursor' do
+      expect(client).to receive(:collect_with_cursor)
+      client.follower_ids
     end
-    
-    context 'without a screen name passed' do
-      before(:each) do
-      end
+  end
 
-      pending 'requests the correct resources' do
-      end
-
-      pending 'returns Array of Twitter::User' do
-      end
-
-      pending 'returns the all tweets posted by the auth user' do
-      end
+  describe '#users' do
+    it 'call old_users' do
+      expect(client).to receive(:old_users)
+      client.users([1, 2, 3])
     end
   end
 end
