@@ -79,12 +79,36 @@ class ExTwitter < Twitter::REST::Client
     logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
 
     if auto_paginate
+      num_attempts = 0
       (max_calls - 1).times do
         break unless last_response.any?
 
         options[:max_id] = last_response.last.id - 1
-        last_response = send(method_name, *args, options)
-        logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
+
+        begin
+          last_response = send(method_name, *args, options)
+          logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
+        rescue Twitter::Error::TooManyRequests => e
+          if num_attempts <= MAX_ATTEMPTS
+            if WAIT
+              sleep e.rate_limit.reset_in
+              num_attempts += 1
+              retry
+            else
+              logger.warn "retry #{e.rate_limit.reset_in} seconds later, #{e.inspect}"
+            end
+          else
+            logger.warn "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), #{e.inspect}"
+          end
+        rescue => e
+          if num_attempts <= MAX_ATTEMPTS
+            logger.warn "retry till num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), #{e.inspect}"
+            num_attempts += 1
+            retry
+          else
+            logger.warn "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
+          end
+        end
 
         if block_given?
           yield(data, last_response)
@@ -105,13 +129,37 @@ class ExTwitter < Twitter::REST::Client
     data = last_response[:users] || last_response[:ids]
 
     if auto_paginate
+      num_attempts = 0
       (max_calls - 1).times do
         next_cursor = last_response[:next_cursor]
         break if !next_cursor || next_cursor == 0
 
         options[:cursor] = next_cursor
-        last_response = send(method_name, *args, options).attrs
-        logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
+
+        begin
+          last_response = send(method_name, *args, options).attrs
+          logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
+        rescue Twitter::Error::TooManyRequests => e
+          if num_attempts <= MAX_ATTEMPTS
+            if WAIT
+              sleep e.rate_limit.reset_in
+              num_attempts += 1
+              retry
+            else
+              logger.warn "retry #{e.rate_limit.reset_in} seconds later, #{e.inspect}"
+            end
+          else
+            logger.warn "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), #{e.inspect}"
+          end
+        rescue => e
+          if num_attempts <= MAX_ATTEMPTS
+            logger.warn "retry till num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), #{e.inspect}"
+            num_attempts += 1
+            retry
+          else
+            logger.warn "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
+          end
+        end
 
         if block_given?
           yield(data, last_response)
