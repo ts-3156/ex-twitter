@@ -1,6 +1,9 @@
 ex-twitter
 ==========
 
+[![Gem Version](https://badge.fury.io/rb/ex_twitter.png)](https://badge.fury.io/rb/ex_twitter)
+[![Build Status](https://travis-ci.org/ts-3156/ex-twitter.svg?branch=master)](https://travis-ci.org/ts-3156/ex-twitter)
+
 A Ruby wrapper to the Twitter gem.
 
 ## Installation
