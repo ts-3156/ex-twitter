@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'bundler'
 
   spec.authors = ['Shinohara Teruki']
-  spec.description = %q(A wrapper to the Twitter gem.)
+  spec.description = %q(Add auto paginate feature to Twitter gem.)
   spec.email = %w[ts_3156@yahoo.co.jp]
   spec.files = %w[LICENSE.md README.md Rakefile ex_twitter.gemspec]
   spec.files += Dir.glob('lib/**/*.rb')
@@ -20,5 +20,5 @@ Gem::Specification.new do |spec|
   spec.require_paths = %w[lib]
   spec.summary = spec.description
   spec.test_files = Dir.glob('spec/**/*')
-  spec.version = '0.0.2'
+  spec.version = '0.0.3'
 end
