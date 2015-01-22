@@ -8,63 +8,43 @@ require 'logger'
 
 # extended twitter
 class ExTwitter < Twitter::REST::Client
-  attr_accessor :cache, :cache_expires_in, :max_attempts, :wait, :auto_paginate, :logger
+  attr_accessor :cache, :cache_expires_in, :max_retries, :wait, :auto_paginate, :max_paginates, :logger
 
-  MAX_ATTEMPTS = 1
+  MAX_RETRIES = 1
   WAIT = false
-  CACHE_EXPIRES_IN = 300
+  # CACHE_EXPIRES_IN = 300
   AUTO_PAGINATE = true
-  MAX_CALLS = 3
+  MAX_PAGINATES = 3
 
-  def self.get_config_value(config)
-    return {} if config.nil?
-    {
-      consumer_key:        config['consumer_key'],
-      consumer_secret:     config['consumer_secret'],
-      access_token:        config['access_token'],
-      access_token_secret: config['access_token_secret'],
-      max_attempts:        config['max_attempts'],
-      cache_expires_in:    config['cache_expires_in'],
-      auto_paginate:       config['auto_paginate'],
-    }
-  end
-
-  def initialize(config={})
+  def initialize(options = {})
     self.logger = Logger.new(STDOUT)
     self.logger.level = Logger::DEBUG
 
-    if config.empty?
-      yml_config = if File.exists?(File.expand_path('./', 'config.yml'))
-        YAML.load_file('config.yml')
-      elsif File.exists?(File.expand_path('./config/', 'config.yml'))
-        YAML.load_file('config/config.yml')
-      end
-      config = self.class.get_config_value(yml_config)
-    end
+    self.auto_paginate = AUTO_PAGINATE
+    self.max_retries = MAX_RETRIES
+    self.wait = WAIT
+    self.max_paginates = MAX_PAGINATES
 
-    self.auto_paginate = (config[:auto_paginate] || AUTO_PAGINATE)
-    self.max_attempts = (config[:max_attempts] || MAX_ATTEMPTS)
-    self.wait = (config[:wait] || WAIT)
-    self.cache_expires_in = (config[:cache_expires_in] || CACHE_EXPIRES_IN)
-    self.cache = ActiveSupport::Cache::FileStore.new(File.join(Dir::pwd, 'ex_twitter_cache'),
-      {expires_in: self.cache_expires_in, race_condition_ttl: self.cache_expires_in})
+    # self.cache_expires_in = (config[:cache_expires_in] || CACHE_EXPIRES_IN)
+    # self.cache = ActiveSupport::Cache::FileStore.new(File.join(Dir::pwd, 'ex_twitter_cache'),
+    #   {expires_in: self.cache_expires_in, race_condition_ttl: self.cache_expires_in})
 
     super
   end
 
-  def read(key)
-    self.cache.read(key)
-  rescue => e
-    logger.warn "in read #{key} #{e.inspect}"
-    nil
-  end
-
-  def write(key, value)
-    self.cache.write(key, value)
-  rescue => e
-    logger.warn "in write #{key} #{value} #{e.inspect}"
-    false
-  end
+  # def read(key)
+  #   self.cache.read(key)
+  # rescue => e
+  #   logger.warn "in read #{key} #{e.inspect}"
+  #   nil
+  # end
+  #
+  # def write(key, value)
+  #   self.cache.write(key, value)
+  # rescue => e
+  #   logger.warn "in write #{key} #{value} #{e.inspect}"
+  #   false
+  # end
 
   # githubでは、レスポンスが次のエンドポイントを知っているため、ブロックをデータの結合のみに使っている。引数ではAPI名を渡している。
   # 一方、twitterでは、レスポンスが次のエンドポイントを知らないため、ブロック内にAPI名を持ち、再帰的にブロックを呼び出している。
@@ -86,12 +66,12 @@ class ExTwitter < Twitter::REST::Client
     options = args.extract_options!
     logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
 
-    max_calls = options.delete(:max_calls) || MAX_CALLS
+    max_paginates = options.delete(:max_paginates) || MAX_PAGINATES
     data = last_response = send(method_name, *args, options)
 
     if auto_paginate
-      num_attempts = 0
-      (max_calls - 1).times do
+      num_retries = 0
+      (max_paginates - 1).times do
         break unless last_response.any?
 
         options[:max_id] = last_response.last.id - 1
@@ -100,24 +80,24 @@ class ExTwitter < Twitter::REST::Client
           last_response = send(method_name, *args, options)
           logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
         rescue Twitter::Error::TooManyRequests => e
-          if num_attempts <= MAX_ATTEMPTS
+          if num_retries <= MAX_RETRIES
             if WAIT
               sleep e.rate_limit.reset_in
-              num_attempts += 1
+              num_retries += 1
               retry
             else
               logger.warn "retry #{e.rate_limit.reset_in} seconds later, #{e.inspect}"
             end
           else
-            logger.warn "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), #{e.inspect}"
+            logger.warn "fail. num_retries > MAX_RETRIES(=#{MAX_RETRIES}), #{e.inspect}"
           end
         rescue => e
-          if num_attempts <= MAX_ATTEMPTS
-            logger.warn "retry till num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), #{e.inspect}"
-            num_attempts += 1
+          if num_retries <= MAX_RETRIES
+            logger.warn "retry till num_retries > MAX_RETRIES(=#{MAX_RETRIES}), #{e.inspect}"
+            num_retries += 1
             retry
           else
-            logger.warn "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
+            logger.warn "fail. num_retries > MAX_RETRIES(=#{MAX_RETRIES}), something error #{e.inspect}"
           end
         end
 
@@ -137,13 +117,13 @@ class ExTwitter < Twitter::REST::Client
     options = args.extract_options!
     logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
 
-    max_calls = options.delete(:max_calls) || MAX_CALLS
+    max_paginates = options.delete(:max_paginates) || MAX_PAGINATES
     last_response = send(method_name, *args, options).attrs
     data = last_response[:users] || last_response[:ids]
 
     if auto_paginate
-      num_attempts = 0
-      (max_calls - 1).times do
+      num_retries = 0
+      (max_paginates - 1).times do
         next_cursor = last_response[:next_cursor]
         break if !next_cursor || next_cursor == 0
 
@@ -153,24 +133,24 @@ class ExTwitter < Twitter::REST::Client
           last_response = send(method_name, *args, options).attrs
           logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
         rescue Twitter::Error::TooManyRequests => e
-          if num_attempts <= MAX_ATTEMPTS
+          if num_retries <= MAX_RETRIES
             if WAIT
               sleep e.rate_limit.reset_in
-              num_attempts += 1
+              num_retries += 1
               retry
             else
               logger.warn "retry #{e.rate_limit.reset_in} seconds later, #{e.inspect}"
             end
           else
-            logger.warn "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), #{e.inspect}"
+            logger.warn "fail. num_retries > MAX_RETRIES(=#{MAX_RETRIES}), #{e.inspect}"
           end
         rescue => e
-          if num_attempts <= MAX_ATTEMPTS
-            logger.warn "retry till num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), #{e.inspect}"
-            num_attempts += 1
+          if num_retries <= MAX_RETRIES
+            logger.warn "retry till num_retries > MAX_RETRIES(=#{MAX_RETRIES}), #{e.inspect}"
+            num_retries += 1
             retry
           else
-            logger.warn "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
+            logger.warn "fail. num_retries > MAX_RETRIES(=#{MAX_RETRIES}), something error #{e.inspect}"
           end
         end
 
@@ -253,13 +233,13 @@ class ExTwitter < Twitter::REST::Client
   end
 
   def search_tweets(str, options)
-    num_attempts = 0
+    num_retries = 0
     begin
-      num_attempts += 1
+      num_retries += 1
       result = search(str, options)
       [result.take(100), nil]
     rescue Twitter::Error::TooManyRequests => e
-      if num_attempts <= MAX_ATTEMPTS
+      if num_retries <= MAX_RETRIES
         if WAIT
           sleep e.rate_limit.reset_in
           retry
@@ -268,14 +248,14 @@ class ExTwitter < Twitter::REST::Client
           [[], e]
         end
       else
-        puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS})"
+        puts "fail. num_retries > MAX_RETRIES(=#{MAX_RETRIES})"
         [[], e]
       end
     rescue => e
-      if num_attempts <= MAX_ATTEMPTS
+      if num_retries <= MAX_RETRIES
         retry
       else
-        puts "fail. num_attempts > MAX_ATTEMPTS(=#{MAX_ATTEMPTS}), something error #{e.inspect}"
+        puts "fail. num_retries > MAX_RETRIES(=#{MAX_RETRIES}), something error #{e.inspect}"
         [[], e]
       end
     end
