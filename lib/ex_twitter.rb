@@ -1,3 +1,5 @@
+require 'active_support'
+require 'active_support/core_ext'
 require 'twitter'
 require 'yaml'
 require 'active_support'
@@ -11,18 +13,26 @@ class ExTwitter < Twitter::REST::Client
   MAX_ATTEMPTS = 1
   WAIT = false
   CACHE_EXPIRES_IN = 300
+  AUTO_PAGINATE = true
+  MAX_CALLS = 3
 
   def self.get_config_value(config)
     return {} if config.nil?
     {
-      consumer_key: config['consumer_key'],
-      consumer_secret: config['consumer_secret'],
-      access_token: config['access_token'],
-      access_token_secret: config['access_token_secret']
+      consumer_key:        config['consumer_key'],
+      consumer_secret:     config['consumer_secret'],
+      access_token:        config['access_token'],
+      access_token_secret: config['access_token_secret'],
+      max_attempts:        config['max_attempts'],
+      cache_expires_in:    config['cache_expires_in'],
+      auto_paginate:       config['auto_paginate'],
     }
   end
 
   def initialize(config={})
+    self.logger = Logger.new(STDOUT)
+    self.logger.level = Logger::DEBUG
+
     if config.empty?
       yml_config = if File.exists?(File.expand_path('./', 'config.yml'))
         YAML.load_file('config.yml')
@@ -32,15 +42,13 @@ class ExTwitter < Twitter::REST::Client
       config = self.class.get_config_value(yml_config)
     end
 
-    self.auto_paginate = (config[:auto_paginate] || true)
+    self.auto_paginate = (config[:auto_paginate] || AUTO_PAGINATE)
     self.max_attempts = (config[:max_attempts] || MAX_ATTEMPTS)
     self.wait = (config[:wait] || WAIT)
     self.cache_expires_in = (config[:cache_expires_in] || CACHE_EXPIRES_IN)
     self.cache = ActiveSupport::Cache::FileStore.new(File.join(Dir::pwd, 'ex_twitter_cache'),
       {expires_in: self.cache_expires_in, race_condition_ttl: self.cache_expires_in})
 
-    self.logger = Logger.new(STDOUT)
-    self.logger.level = Logger::DEBUG
     super
   end
 
@@ -72,11 +80,14 @@ class ExTwitter < Twitter::REST::Client
   #
   # twitterで再帰方式がとられている理由は、おそらく、一般ユーザー向けのサンプルでメソッド名を渡すようなリフレクションを避けるため、
   # なのかもしれない。
+
+  # max_idを使って自動ページングを行う
   def collect_with_max_id(method_name, *args, &block)
-    options = args.last.is_a?(Hash) ? args.pop : {}
-    max_calls = options.delete(:max_calls) || 3
-    data = last_response = send(method_name, *args, options)
+    options = args.extract_options!
     logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
+
+    max_calls = options.delete(:max_calls) || MAX_CALLS
+    data = last_response = send(method_name, *args, options)
 
     if auto_paginate
       num_attempts = 0
@@ -121,11 +132,13 @@ class ExTwitter < Twitter::REST::Client
     data
   end
 
+  # cursorを使って自動ページングを行う
   def collect_with_cursor(method_name, *args, &block)
-    options = args.last.is_a?(Hash) ? args.pop : {}
-    max_calls = options.delete(:max_calls) || 3
-    last_response = send(method_name, *args, options).attrs
+    options = args.extract_options!
     logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
+
+    max_calls = options.delete(:max_calls) || MAX_CALLS
+    last_response = send(method_name, *args, options).attrs
     data = last_response[:users] || last_response[:ids]
 
     if auto_paginate
@@ -174,33 +187,38 @@ class ExTwitter < Twitter::REST::Client
   end
 
   alias :old_user_timeline :user_timeline
-  def user_timeline(user = nil, options = {})
-    options = options.merge({count: 200, include_rts: true})
-    collect_with_max_id(:old_user_timeline, user, options)
+  def user_timeline(*args)
+    options = {count: 200, include_rts: true}.merge(args.extract_options!)
+    collect_with_max_id(:old_user_timeline, *args, options)
+  end
+
+  def user_photos(*args)
+    tweets = user_timeline(*args)
+    tweets.select{|t| t.media? }.map{|t| t.media }.flatten
   end
 
   alias :old_friends :friends
-  def friends(user = nil, options = {})
-    options = options.merge({count: 200, include_user_entities: true})
-    collect_with_cursor(:old_friends, user, options)
+  def friends(*args)
+    options = {count: 200, include_user_entities: true}.merge(args.extract_options!)
+    collect_with_cursor(:old_friends, *args, options)
   end
 
   alias :old_followers :followers
-  def followers(user = nil, options = {})
-    options = options.merge({count: 200, include_user_entities: true})
-    collect_with_cursor(:old_followers, user, options)
+  def followers(*args)
+    options = {count: 200, include_user_entities: true}.merge(args.extract_options!)
+    collect_with_cursor(:old_followers, *args, options)
   end
 
   alias :old_friend_ids :friend_ids
-  def friend_ids(user = nil, options = {})
-    options = options.merge({count: 5000})
-    collect_with_cursor(:old_friend_ids, user, options)
+  def friend_ids(*args)
+    options = {count: 5000}.merge(args.extract_options!)
+    collect_with_cursor(:old_friend_ids, *args, options)
   end
 
   alias :old_follower_ids :follower_ids
-  def follower_ids(user = nil, options = {})
-    options = options.merge({count: 5000})
-    collect_with_cursor(:old_follower_ids, user, options)
+  def follower_ids(*args)
+    options = {count: 5000}.merge(args.extract_options!)
+    collect_with_cursor(:old_follower_ids, *args, options)
   end
 
   alias :old_users :users
@@ -215,6 +233,10 @@ class ExTwitter < Twitter::REST::Client
 
     processed_users.sort_by{|p| p[:i] }.map{|p| p[:users] }.flatten
   end
+
+
+
+  # ここから下は実装できているのか不明
 
   # mentions_timeline is to fetch the timeline of Tweets mentioning the authenticated user
   # get_mentions is to fetch the Tweets mentioning the screen_name's user
