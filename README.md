@@ -51,3 +51,10 @@ end
 client.user_timeline
 ```
 
+## Memo
+
+```
+be rake build
+be rake release
+```
+

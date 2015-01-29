@@ -4,3 +4,4 @@ access_token: ACCESS_TOKEN
 access_token_secret: ACCESS_TOKEN_SECRET
 max_attempts: 3
 cache_expires_in: 600
+auto_paginate: true

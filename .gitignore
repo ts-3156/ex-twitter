@@ -18,7 +18,7 @@ _yardoc
 doc/
 
 Gemfile.lock
-config.yml
 ex_twitter_cache
 /.idea
 .DS_Store
+/config/twitter.yml

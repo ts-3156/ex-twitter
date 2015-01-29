@@ -67,14 +67,20 @@ class ExTwitter < Twitter::REST::Client
     logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
 
     max_paginates = options.delete(:max_paginates) || MAX_PAGINATES
-    data = last_response = send(method_name, *args, options)
+    data = []
+    last_response = send(method_name, *args, options)
+    if block_given?
+      last_response = yield(data, last_response)
+    else
+      data.concat(last_response) if last_response.is_a?(Array)
+    end
 
     if auto_paginate
       num_retries = 0
       (max_paginates - 1).times do
-        break unless last_response.any?
+        break if last_response.blank?
 
-        options[:max_id] = last_response.last.id - 1
+        options[:max_id] = last_response.last[:id] - 1
 
         begin
           last_response = send(method_name, *args, options)
@@ -102,7 +108,7 @@ class ExTwitter < Twitter::REST::Client
         end
 
         if block_given?
-          yield(data, last_response)
+          last_response = yield(data, last_response)
         else
           data.concat(last_response) if last_response.is_a?(Array)
         end
@@ -214,51 +220,47 @@ class ExTwitter < Twitter::REST::Client
     processed_users.sort_by{|p| p[:i] }.map{|p| p[:users] }.flatten
   end
 
-
-
-  # ここから下は実装できているのか不明
+  # Returns tweets that match a specified query.
+  #
+  # @see https://dev.twitter.com/docs/api/1.1/get/search/tweets
+  # @see https://dev.twitter.com/docs/using-search
+  # @note Please note that Twitter's search service and, by extension, the Search API is not meant to be an exhaustive source of Tweets. Not all Tweets will be indexed or made available via the search interface.
+  # @rate_limited Yes
+  # @authentication Requires user context
+  # @raise [Twitter::Error::Unauthorized] Error raised when supplied user credentials are not valid.
+  # @param q [String] A search term. (from|to):hello min_retweets:3 OR min_faves:3 OR min_replies:3, #nhk @hello (in|ex)clude:retweets https://twitter.com/search-advanced
+  # @param options [Hash] A customizable set of options.
+  # @option options [String] :geocode Returns tweets by users located within a given radius of the given latitude/longitude. The location is preferentially taking from the Geotagging API, but will fall back to their Twitter profile. The parameter value is specified by "latitude,longitude,radius", where radius units must be specified as either "mi" (miles) or "km" (kilometers). Note that you cannot use the near operator via the API to geocode arbitrary locations; however you can use this geocode parameter to search near geocodes directly.
+  # @option options [String] :lang Restricts tweets to the given language, given by an ISO 639-1 code.
+  # @option options [String] :locale Specify the language of the query you are sending (only ja is currently effective). This is intended for language-specific clients and the default should work in the majority of cases.
+  # @option options [String] :result_type Specifies what type of search results you would prefer to receive. Options are "mixed", "recent", and "popular". The current default is "mixed."
+  # @option options [Integer] :count The number of tweets to return per page, up to a maximum of 100.
+  # @option options [String] :until Optional. Returns tweets generated before the given date. Date should be formatted as YYYY-MM-DD.
+  # @option options [Integer] :since_id Returns results with an ID greater than (that is, more recent than) the specified ID. There are limits to the number of Tweets which can be accessed through the API. If the limit of Tweets has occured since the since_id, the since_id will be forced to the oldest ID available.
+  # @option options [Integer] :max_id Returns results with an ID less than (that is, older than) or equal to the specified ID.
+  # @return [Twitter::SearchResults] Return tweets that match a specified query with search metadata
+  alias :old_search :search
+  def search(*args)
+    options = {count: 100, result_type: 'recent'}.merge(args.extract_options!)
+    collect_with_max_id(:old_search, *args, options) do |data, last_response|
+      statuses = last_response.attrs[:statuses]
+      data.concat(statuses)
+      statuses
+    end
+  end
 
   # mentions_timeline is to fetch the timeline of Tweets mentioning the authenticated user
   # get_mentions is to fetch the Tweets mentioning the screen_name's user
   def get_mentions(screen_name)
-    search_tweets("to:#{screen_name}", {result_type: 'recent', count: 100})
+    search("to:#{screen_name}")
   end
 
   def search_japanese_tweets(str)
-    search_tweets(str, {result_type: 'recent', count: 100, lang: 'ja'})
+    search(str, {lang: 'ja'})
   end
 
   def search_tweets_except_rt(str)
-    search_tweets("#{str} -rt", {result_type: 'recent', count: 100})
-  end
-
-  def search_tweets(str, options)
-    num_retries = 0
-    begin
-      num_retries += 1
-      result = search(str, options)
-      [result.take(100), nil]
-    rescue Twitter::Error::TooManyRequests => e
-      if num_retries <= MAX_RETRIES
-        if WAIT
-          sleep e.rate_limit.reset_in
-          retry
-        else
-          puts "retry #{e.rate_limit.reset_in} seconds later"
-          [[], e]
-        end
-      else
-        puts "fail. num_retries > MAX_RETRIES(=#{MAX_RETRIES})"
-        [[], e]
-      end
-    rescue => e
-      if num_retries <= MAX_RETRIES
-        retry
-      else
-        puts "fail. num_retries > MAX_RETRIES(=#{MAX_RETRIES}), something error #{e.inspect}"
-        [[], e]
-      end
-    end
+    search("#{str} exclude:retweets")
   end
 end
 
