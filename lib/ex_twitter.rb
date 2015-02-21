@@ -7,7 +7,7 @@ require 'parallel'
 require 'logger'
 
 # extended twitter
-class ExTwitter < Twitter::REST::Client
+class ExTwitter < Twitter::REST::Client # https://github.com/sferik/twitter/blob/master/lib/twitter/client.rb
   attr_accessor :cache, :cache_expires_in, :max_retries, :wait, :auto_paginate, :max_paginates, :logger
 
   MAX_RETRIES = 1
@@ -66,16 +66,16 @@ class ExTwitter < Twitter::REST::Client
     options = args.extract_options!
     logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
 
-    max_paginates = options.delete(:max_paginates) || MAX_PAGINATES
-    data = []
+    max_paginates = options.delete(:max_paginates) || self.max_paginates
+    return_data = []
     last_response = send(method_name, *args, options)
     if block_given?
-      last_response = yield(data, last_response)
+      last_response = yield(return_data, last_response)
     else
-      data.concat(last_response) if last_response.is_a?(Array)
+      return_data.concat(last_response) if last_response.is_a?(Array)
     end
 
-    if auto_paginate
+    if self.auto_paginate
       num_retries = 0
       (max_paginates - 1).times do
         break if last_response.blank?
@@ -86,8 +86,8 @@ class ExTwitter < Twitter::REST::Client
           last_response = send(method_name, *args, options)
           logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
         rescue Twitter::Error::TooManyRequests => e
-          if num_retries <= MAX_RETRIES
-            if WAIT
+          if num_retries <= self.max_retries
+            if self.wait
               sleep e.rate_limit.reset_in
               num_retries += 1
               retry
@@ -95,27 +95,27 @@ class ExTwitter < Twitter::REST::Client
               logger.warn "retry #{e.rate_limit.reset_in} seconds later, #{e.inspect}"
             end
           else
-            logger.warn "fail. num_retries > MAX_RETRIES(=#{MAX_RETRIES}), #{e.inspect}"
+            logger.warn "fail because of num_retries > #{self.max_retries}, #{e.inspect}"
           end
         rescue => e
-          if num_retries <= MAX_RETRIES
-            logger.warn "retry till num_retries > MAX_RETRIES(=#{MAX_RETRIES}), #{e.inspect}"
+          if num_retries <= self.max_retries
+            logger.warn "retry till num_retries > #{self.max_retries}, #{e.inspect}"
             num_retries += 1
             retry
           else
-            logger.warn "fail. num_retries > MAX_RETRIES(=#{MAX_RETRIES}), something error #{e.inspect}"
+            logger.warn "fail because of num_retries > #{self.max_retries}, something error #{e.inspect}"
           end
         end
 
         if block_given?
-          last_response = yield(data, last_response)
+          last_response = yield(return_data, last_response)
         else
-          data.concat(last_response) if last_response.is_a?(Array)
+          return_data.concat(last_response) if last_response.is_a?(Array)
         end
       end
     end
 
-    data
+    return_data
   end
 
   # cursorを使って自動ページングを行う
@@ -123,11 +123,17 @@ class ExTwitter < Twitter::REST::Client
     options = args.extract_options!
     logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
 
-    max_paginates = options.delete(:max_paginates) || MAX_PAGINATES
-    last_response = send(method_name, *args, options).attrs
-    data = last_response[:users] || last_response[:ids]
+    max_paginates = options.delete(:max_paginates) || self.max_paginates
+    last_response = send(method_name, *args, options).attrs rescue {}
+    return_data = []
+    if block_given?
+      yield(return_data, last_response)
+    else
+      items = last_response[:users] || last_response[:ids]
+      return_data.concat(items) if items.is_a?(Array)
+    end
 
-    if auto_paginate
+    if self.auto_paginate
       num_retries = 0
       (max_paginates - 1).times do
         next_cursor = last_response[:next_cursor]
@@ -136,11 +142,11 @@ class ExTwitter < Twitter::REST::Client
         options[:cursor] = next_cursor
 
         begin
-          last_response = send(method_name, *args, options).attrs
+          last_response = send(method_name, *args, options).attrs rescue {}
           logger.info "#{method_name}, #{args.inspect} #{options.inspect}"
         rescue Twitter::Error::TooManyRequests => e
-          if num_retries <= MAX_RETRIES
-            if WAIT
+          if num_retries <= self.max_retries
+            if self.wait
               sleep e.rate_limit.reset_in
               num_retries += 1
               retry
@@ -148,28 +154,28 @@ class ExTwitter < Twitter::REST::Client
               logger.warn "retry #{e.rate_limit.reset_in} seconds later, #{e.inspect}"
             end
           else
-            logger.warn "fail. num_retries > MAX_RETRIES(=#{MAX_RETRIES}), #{e.inspect}"
+            logger.warn "fail because of num_retries > #{self.max_retries}, #{e.inspect}"
           end
         rescue => e
-          if num_retries <= MAX_RETRIES
-            logger.warn "retry till num_retries > MAX_RETRIES(=#{MAX_RETRIES}), #{e.inspect}"
+          if num_retries <= self.max_retries
+            logger.warn "retry till num_retries > #{self.max_retries}, #{e.inspect}"
             num_retries += 1
             retry
           else
-            logger.warn "fail. num_retries > MAX_RETRIES(=#{MAX_RETRIES}), something error #{e.inspect}"
+            logger.warn "fail because of num_retries > #{self.max_retries}, something error #{e.inspect}"
           end
         end
 
         if block_given?
-          yield(data, last_response)
+          yield(return_data, last_response)
         else
           items = last_response[:users] || last_response[:ids]
-          data.concat(items) if items.is_a?(Array)
+          return_data.concat(items) if items.is_a?(Array)
         end
       end
     end
 
-    data
+    return_data
   end
 
   alias :old_user_timeline :user_timeline
@@ -180,7 +186,7 @@ class ExTwitter < Twitter::REST::Client
 
   def user_photos(*args)
     tweets = user_timeline(*args)
-    tweets.select{|t| t.media? }.map{|t| t.media }.flatten
+    tweets.select{|t| t.media? }.map{|t| t.media }.flatten if tweets.is_a?(Array)
   end
 
   alias :old_friends :friends
