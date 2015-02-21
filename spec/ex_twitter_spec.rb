@@ -82,4 +82,35 @@ describe ExTwitter do
       client.followers
     end
   end
+
+  describe '#friend_ids' do
+    it 'calls old_friend_ids' do
+      expect(client).to receive(:old_friend_ids)
+      client.friend_ids
+    end
+
+    it 'calls collect_with_cursor' do
+      expect(client).to receive(:collect_with_cursor)
+      client.friend_ids
+    end
+  end
+
+  describe '#follower_ids' do
+    it 'calls old_follower_ids' do
+      expect(client).to receive(:old_follower_ids)
+      client.follower_ids
+    end
+
+    it 'calls collect_with_cursor' do
+      expect(client).to receive(:collect_with_cursor)
+      client.follower_ids
+    end
+  end
+
+  describe '#users' do
+    it 'calls old_users' do
+      expect(client).to receive(:old_users)
+      client.users([1, 2, 3])
+    end
+  end
 end

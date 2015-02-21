@@ -218,8 +218,8 @@ class ExTwitter < Twitter::REST::Client # https://github.com/sferik/twitter/blob
     ids_per_worker = ids.each_slice(100).to_a
     processed_users = []
 
-    Parallel.each_with_index(ids_per_worker, in_threads: ids_per_worker.size) do |ids, i|
-      _users = {i: i, users: old_users(ids, options)}
+    Parallel.each_with_index(ids_per_worker, in_threads: ids_per_worker.size) do |_ids, i|
+      _users = {i: i, users: old_users(_ids, options)}
       processed_users << _users
     end
 
