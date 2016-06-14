@@ -2,6 +2,7 @@ source 'https://rubygems.org'
 
 gem 'rake'
 gem 'activesupport'
+gem 'memoist'
 
 group :development do
   gem 'pry'

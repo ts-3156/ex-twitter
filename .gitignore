@@ -21,4 +21,5 @@ Gemfile.lock
 ex_twitter_cache
 /.idea
 .DS_Store
+.rbenv-gemsets
 /config/twitter.yml
