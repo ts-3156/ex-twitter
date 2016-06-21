@@ -1,7 +1,9 @@
 require 'active_support'
 require 'active_support/cache'
+require 'active_support/core_ext/string'
 
 require 'twitter'
+require 'hashie'
 require 'memoist'
 require 'parallel'
 
@@ -49,6 +51,7 @@ class ExTwitter < Twitter::REST::Client
   end
 
   def logger
+    Dir.mkdir('log') unless File.exists?('log')
     @logger ||= Logger.new('log/ex_twitter.log')
   end
 
@@ -149,6 +152,54 @@ class ExTwitter < Twitter::REST::Client
     file_cache_key(method_name, user)
   end
 
+  PROFILE_SAVE_KEYS = %i(
+      id
+      name
+      screen_name
+      location
+      description
+      url
+      protected
+      followers_count
+      friends_count
+      listed_count
+      favourites_count
+      utc_offset
+      time_zone
+      geo_enabled
+      verified
+      statuses_count
+      lang
+      status
+      profile_image_url_https
+      profile_banner_url
+      profile_link_color
+      suspended
+      verified
+      entities
+      created_at
+    )
+
+  STATUS_SAVE_KEYS = %i(
+    created_at
+    id
+    text
+    source
+    truncated
+    coordinates
+    place
+    entities
+    user
+    contributors
+    is_quote_status
+    retweet_count
+    favorite_count
+    favorited
+    retweeted
+    possibly_sensitive
+    lang
+  )
+
   # encode
   def encode_json(obj, caller_name, options = {})
     options[:reduce] = true unless options.has_key?(:reduce)
@@ -161,7 +212,7 @@ class ExTwitter < Twitter::REST::Client
         when :search # Hash
           data =
             if options[:reduce]
-              obj.map { |o| o.to_hash.slice(*Status::STATUS_SAVE_KEYS) }
+              obj.map { |o| o.to_hash.slice(*STATUS_SAVE_KEYS) }
             else
               obj.map { |o| o.to_hash }
             end
@@ -170,7 +221,7 @@ class ExTwitter < Twitter::REST::Client
         when :friends, :followers # Hash
           data =
             if options[:reduce]
-              obj.map { |o| o.to_hash.slice(*TwitterUser::PROFILE_SAVE_KEYS) }
+              obj.map { |o| o.to_hash.slice(*PROFILE_SAVE_KEYS) }
             else
               obj.map { |o| o.to_hash }
             end
@@ -180,12 +231,12 @@ class ExTwitter < Twitter::REST::Client
           JSON.pretty_generate(obj)
 
         when :user # Twitter::User
-          JSON.pretty_generate(obj.to_hash.slice(*TwitterUser::PROFILE_SAVE_KEYS))
+          JSON.pretty_generate(obj.to_hash.slice(*PROFILE_SAVE_KEYS))
 
         when :users, :friends_advanced, :followers_advanced # Twitter::User
           data =
             if options[:reduce]
-              obj.map { |o| o.to_hash.slice(*TwitterUser::PROFILE_SAVE_KEYS) }
+              obj.map { |o| o.to_hash.slice(*PROFILE_SAVE_KEYS) }
             else
               obj.map { |o| o.to_hash }
             end
