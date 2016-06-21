@@ -12,32 +12,47 @@ describe ExTwitter do
   let(:client) { ExTwitter.new(config) }
 
   describe '#initialize' do
-    let(:default_max_paginates) { 3 }
-    let(:max_paginates) { 100 }
+    let(:default_call_count) { 0 }
+
+    it 'sets call_count to 0' do
+      expect(client.call_count).to eq(default_call_count)
+    end
 
     context 'without params' do
-      it 'uses default max_paginates' do
-        expect(ExTwitter.new.max_paginates).to eq(default_max_paginates)
-      end
     end
 
     context 'with params' do
-      it 'uses passed max_paginates' do
-        expect(ExTwitter.new(max_paginates: max_paginates).max_paginates).to eq(max_paginates)
-      end
     end
+  end
 
-    context 'with block' do
-      it 'uses given max_paginates in block' do
-        expect(ExTwitter.new {|config| config.max_paginates = max_paginates }.max_paginates).to eq(max_paginates)
-      end
+  describe '#logger' do
+    it 'has logger' do
+      expect(client.logger).to be_truthy
     end
+  end
+
+  describe '#call_old_method' do
   end
 
   describe '#collect_with_max_id' do
   end
 
   describe '#collect_with_cursor' do
+  end
+
+  describe '#file_cache_key' do
+  end
+
+  describe '#namespaced_key' do
+  end
+
+  describe '#encode_json' do
+  end
+
+  describe '#decode_json' do
+  end
+
+  describe '#fetch_cache_or_call_api' do
   end
 
   describe '#user_timeline' do
