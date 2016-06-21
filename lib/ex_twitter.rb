@@ -2,6 +2,8 @@ require 'active_support'
 require 'active_support/cache'
 require 'active_support/core_ext/string'
 
+require 'ex_twitter_subscriber'
+
 require 'twitter'
 require 'hashie'
 require 'memoist'
@@ -20,6 +22,7 @@ class ExTwitter < Twitter::REST::Client
     @screen_name = options[:screen_name]
     @authenticated_user = Hashie::Mash.new({uid: options[:uid].to_i, screen_name: options[:screen_name]})
     @call_count = 0
+    ExTwitterSubscriber.attach_to :ex_twitter
     super
   end
 
@@ -53,6 +56,12 @@ class ExTwitter < Twitter::REST::Client
   def logger
     Dir.mkdir('log') unless File.exists?('log')
     @logger ||= Logger.new('log/ex_twitter.log')
+  end
+
+  def instrument(operation)
+    ActiveSupport::Notifications.instrument('call.ex_twitter', name: operation) do
+      yield
+    end
   end
 
   def call_old_method(method_name, *args)
@@ -304,7 +313,7 @@ class ExTwitter < Twitter::REST::Client
           hit = 'fetch(hit)'
           cache.fetch(key) do
             hit = 'fetch(not hit)'
-            encode_json(yield, method_name, options)
+            instrument(:encode_json) { encode_json(yield, method_name, options) }
           end
         else
           if cache.exist?(key)
