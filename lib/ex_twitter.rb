@@ -310,7 +310,7 @@ class ExTwitter < Twitter::REST::Client
       else
         if block_given?
           hit = 'fetch(hit)'
-          cache.fetch(key, expires_in: 1.hour) do
+          cache.fetch(key, expires_in: 1.hour, race_condition_ttl: 5.minutes) do
             hit = 'fetch(not hit)'
             instrument(:encode_json) { encode_json(yield, method_name, options) }
           end
