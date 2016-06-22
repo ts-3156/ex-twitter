@@ -17,7 +17,6 @@ class ExTwitter < Twitter::REST::Client
   def initialize(options = {})
     api_cache_prefix = options.has_key?(:api_cache_prefix) ? options.delete(:api_cache_prefix) : '%Y%m%d%H'
     @cache = ActiveSupport::Cache::FileStore.new(File.join('tmp', 'api_cache', Time.now.strftime(api_cache_prefix)))
-    @cache2 = ActiveSupport::Cache::FileStore.new(File.join('tmp', 'api_cache', (Time.now + 1.hour).strftime(api_cache_prefix)))
     @uid = options[:uid]
     @screen_name = options[:screen_name]
     @authenticated_user = Hashie::Mash.new({uid: options[:uid].to_i, screen_name: options[:screen_name]})
@@ -27,7 +26,7 @@ class ExTwitter < Twitter::REST::Client
   end
 
   attr_accessor :call_count
-  attr_reader :cache, :cache2, :authenticated_user
+  attr_reader :cache, :authenticated_user
 
   INDENT = 4
 
@@ -311,7 +310,7 @@ class ExTwitter < Twitter::REST::Client
       else
         if block_given?
           hit = 'fetch(hit)'
-          cache.fetch(key) do
+          cache.fetch(key, expires_in: 1.hour) do
             hit = 'fetch(not hit)'
             instrument(:encode_json) { encode_json(yield, method_name, options) }
           end
@@ -325,10 +324,6 @@ class ExTwitter < Twitter::REST::Client
           end
         end
       end
-
-    if !data.nil? && Time.now.min > 30
-      cache2.write(key, data)
-    end
 
     result = decode_json(data, method_name, options)
     logger.debug "#{__method__}: caller=#{method_name} key=#{key} #{hit} (#{Time.now - start_t}s)"
