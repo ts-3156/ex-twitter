@@ -2,7 +2,7 @@ require 'active_support'
 require 'active_support/cache'
 require 'active_support/core_ext/string'
 
-require 'ex_twitter_subscriber'
+require 'log_subscriber'
 
 require 'twitter'
 require 'hashie'
@@ -15,18 +15,28 @@ class ExTwitter < Twitter::REST::Client
   extend Memoist
 
   def initialize(options = {})
-    api_cache_prefix = options.has_key?(:api_cache_prefix) ? options.delete(:api_cache_prefix) : '%Y%m%d%H'
-    @cache = ActiveSupport::Cache::FileStore.new(File.join('tmp', 'api_cache', Time.now.strftime(api_cache_prefix)))
+    @cache = ActiveSupport::Cache::FileStore.new(File.join('tmp', 'api_cache'))
     @uid = options[:uid]
     @screen_name = options[:screen_name]
     @authenticated_user = Hashie::Mash.new({uid: options[:uid].to_i, screen_name: options[:screen_name]})
     @call_count = 0
-    ExTwitterSubscriber.attach_to :ex_twitter
+    LogSubscriber.attach_to :ex_twitter
+    @@logger = @logger =
+      if options[:logger]
+        options.delete(:logger)
+      else
+        Dir.mkdir('log') unless File.exists?('log')
+        Logger.new('log/ex_twitter.log')
+      end
     super
   end
 
+  def self.logger
+    @@logger
+  end
+
   attr_accessor :call_count
-  attr_reader :cache, :authenticated_user
+  attr_reader :cache, :authenticated_user, :logger
 
   INDENT = 4
 
@@ -52,25 +62,18 @@ class ExTwitter < Twitter::REST::Client
     @screen_name
   end
 
-  def logger
-    Dir.mkdir('log') unless File.exists?('log')
-    @logger ||= Logger.new('log/ex_twitter.log')
-  end
-
-  def instrument(operation)
-    ActiveSupport::Notifications.instrument('call.ex_twitter', name: operation) do
-      yield
-    end
+  def instrument(operation, key, options = nil)
+    payload = {operation: operation, key: key}
+    payload.merge!(options) if options.is_a?(Hash)
+    ActiveSupport::Notifications.instrument('call.ex_twitter', payload) { yield(payload) }
   end
 
   def call_old_method(method_name, *args)
     options = args.extract_options!
     begin
-      start_t = Time.now
-      result = send(method_name, *args, options); self.call_count += 1
-      end_t = Time.now
-      logger.debug "#{method_name} #{args.inspect} #{options.inspect} (#{end_t - start_t}s)".indent(INDENT)
-      result
+      self.call_count += 1
+      _options = {method_name: method_name, call_count: self.call_count, args: args}.merge(options)
+      instrument('API Call', args[0], _options) { send(method_name, *args, options) }
     rescue Twitter::Error::TooManyRequests => e
       logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} Retry after #{e.rate_limit.reset_in} seconds."
       raise e
@@ -211,7 +214,6 @@ class ExTwitter < Twitter::REST::Client
   # encode
   def encode_json(obj, caller_name, options = {})
     options[:reduce] = true unless options.has_key?(:reduce)
-    start_t = Time.now
     result =
       case caller_name
         when :user_timeline, :home_timeline, :mentions_timeline, :favorites # Twitter::Tweet
@@ -259,14 +261,11 @@ class ExTwitter < Twitter::REST::Client
         else
           raise "#{__method__}: caller=#{caller_name} key=#{options[:key]} obj=#{obj.inspect}"
       end
-    end_t = Time.now
-    logger.debug "#{__method__}: caller=#{caller_name} key=#{options[:key]} (#{end_t - start_t}s)".indent(INDENT)
     result
   end
 
   # decode
   def decode_json(json_str, caller_name, options = {})
-    start_t = Time.now
     obj = json_str.kind_of?(String) ? JSON.parse(json_str) : json_str
     result =
       case
@@ -291,43 +290,31 @@ class ExTwitter < Twitter::REST::Client
         else
           raise "#{__method__}: caller=#{caller_name} key=#{options[:key]} obj=#{obj.inspect}"
       end
-    end_t = Time.now
-    logger.debug "#{__method__}: caller=#{caller_name} key=#{options[:key]} (#{end_t - start_t}s)".indent(INDENT)
     result
   end
 
   def fetch_cache_or_call_api(method_name, user, options = {})
-    start_t = Time.now
     key = namespaced_key(method_name, user)
     options.update(key: key)
 
-    logger.debug "#{__method__}: caller=#{method_name} key=#{key}"
-
     data =
       if options[:cache] == :read
-        hit = 'force read'
-        cache.read(key)
+        instrument('Cache Read(Force)', key, caller: method_name) { cache.read(key) }
       else
         if block_given?
-          hit = 'fetch(hit)'
-          cache.fetch(key, expires_in: 1.hour, race_condition_ttl: 5.minutes) do
-            hit = 'fetch(not hit)'
-            instrument(:encode_json) { encode_json(yield, method_name, options) }
+          if cache.exist?(key)
+            instrument('Cache Fetch', key, caller: method_name, hit: true) { cache.read(key) }
+          else
+            _d = instrument('Cache Generate', key, caller: method_name) { yield }
+            _serialized = instrument('Cache Serialize', key, caller: method_name) { encode_json(_d, method_name, options) }
+            instrument('Cache Write', key, caller: method_name) { cache.fetch(key, expires_in: 1.hour, race_condition_ttl: 5.minutes) { _serialized } }
           end
         else
-          if cache.exist?(key)
-            hit = 'read(hit)'
-            cache.read(key)
-          else
-            hit = 'read(not hit)'
-            nil
-          end
+          instrument('Cache Read', key, caller: method_name, hit: cache.exist?(key)) { cache.read(key) }
         end
       end
 
-    result = decode_json(data, method_name, options)
-    logger.debug "#{__method__}: caller=#{method_name} key=#{key} #{hit} (#{Time.now - start_t}s)"
-    result
+    instrument('Cache Deserialize', key, caller: method_name) { decode_json(data, method_name, options) }
   end
 
   alias :old_friendship? :friendship?
