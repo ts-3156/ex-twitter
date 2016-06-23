@@ -137,6 +137,15 @@ module ExistingApi
     raise e
   end
 
+  def favorites(*args)
+    raise 'this method needs at least one param to use cache' if args.empty?
+    options = args.extract_options!
+    fetch_cache_or_call_api(:favorites, args[0], options) {
+      options = {count: 100, call_count: 1}.merge(options)
+      collect_with_max_id(:old_favorites, *args, options)
+    }
+  end
+
   def search(*args)
     raise 'this method needs at least one param to use cache' if args.empty?
     options = args.extract_options!
@@ -148,14 +157,5 @@ module ExistingApi
   rescue => e
     logger.warn "#{__method__} #{args.inspect} #{e.class} #{e.message}"
     raise e
-  end
-
-  def favorites(*args)
-    raise 'this method needs at least one param to use cache' if args.empty?
-    options = args.extract_options!
-    fetch_cache_or_call_api(:favorites, args[0], options) {
-      options = {count: 100, call_count: 1}.merge(options)
-      collect_with_max_id(:old_favorites, *args, options)
-    }
   end
 end

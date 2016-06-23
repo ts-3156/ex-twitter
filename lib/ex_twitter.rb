@@ -53,8 +53,8 @@ class ExTwitter < Twitter::REST::Client
   alias :old_home_timeline :home_timeline
   alias :old_user_timeline :user_timeline
   alias :old_mentions_timeline :mentions_timeline
-  alias :old_search :search
   alias :old_favorites :favorites
+  alias :old_search :search
 
   include ExistingApi
 
