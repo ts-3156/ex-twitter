@@ -22,6 +22,19 @@ module ExTwitter
       screen_name
     end
 
+    def uid_or_screen_name?(object)
+      object.kind_of?(String) || object.kind_of?(Integer)
+    end
+
+    def authenticating_user?(target)
+      user.id.to_i == user(target).id.to_i
+    end
+
+    def authorized_user?(target)
+      target_user = user(target)
+      !target_user.protected? || friendship?(user.id.to_i, target_user.id.to_i)
+    end
+
     def instrument(operation, key, options = nil)
       payload = {operation: operation, key: key}
       payload.merge!(options) if options.is_a?(Hash)
@@ -102,7 +115,7 @@ module ExTwitter
             "#{user.kind_of?(Integer) ? 'id' : 'sn'}#{delim}#{user.to_s}"
           when method_name == :home_timeline
             "#{user.kind_of?(Integer) ? 'id' : 'sn'}#{delim}#{user.to_s}"
-          when method_name == :users && options[:super_operation].present?
+          when method_name.in?([:users, :replying]) && options[:super_operation].present?
             case
               when user.kind_of?(Array) && user.first.kind_of?(Integer)
                 "#{options[:super_operation]}-ids#{delim}#{Digest::MD5.hexdigest(user.join(','))}"

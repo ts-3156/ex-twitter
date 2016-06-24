@@ -38,7 +38,7 @@ module ExTwitter
     end
 
     def one_sided_following(me)
-      if me.kind_of?(String) || me.kind_of?(Integer)
+      if uid_or_screen_name?(me)
         # TODO use friends_and_followers
         friends_parallelly(me).to_a - followers_parallelly(me).to_a
       elsif me.respond_to?(:friends) && me.respond_to?(:followers)
@@ -49,7 +49,7 @@ module ExTwitter
     end
 
     def one_sided_followers(me)
-      if me.kind_of?(String) || me.kind_of?(Integer)
+      if uid_or_screen_name?(me)
         # TODO use friends_and_followers
         followers_parallelly(me).to_a - friends_parallelly(me).to_a
       elsif me.respond_to?(:friends) && me.respond_to?(:followers)
@@ -60,7 +60,7 @@ module ExTwitter
     end
 
     def mutual_friends(me)
-      if me.kind_of?(String) || me.kind_of?(Integer)
+      if uid_or_screen_name?(me)
         # TODO use friends_and_followers
         friends_parallelly(me).to_a & followers_parallelly(me).to_a
       elsif me.respond_to?(:friends) && me.respond_to?(:followers)
@@ -71,7 +71,7 @@ module ExTwitter
     end
 
     def common_friends(me, you)
-      if (me.kind_of?(String) || me.kind_of?(Integer)) && (you.kind_of?(String) || you.kind_of?(Integer))
+      if uid_or_screen_name?(me) && uid_or_screen_name?(you)
         friends_parallelly(me).to_a & friends_parallelly(you).to_a
       elsif me.respond_to?(:friends) && you.respond_to?(:friends)
         me.friends.to_a & you.friends.to_a
@@ -81,7 +81,7 @@ module ExTwitter
     end
 
     def common_followers(me, you)
-      if (me.kind_of?(String) || me.kind_of?(Integer)) && (you.kind_of?(String) || you.kind_of?(Integer))
+      if uid_or_screen_name?(me) && uid_or_screen_name?(you)
         followers_parallelly(me).to_a & followers_parallelly(you).to_a
       elsif me.respond_to?(:followers) && you.respond_to?(:followers)
         me.followers.to_a & you.followers.to_a
@@ -91,7 +91,7 @@ module ExTwitter
     end
 
     def removing(pre_me, cur_me)
-      if (pre_me.kind_of?(String) || pre_me.kind_of?(Integer)) && (cur_me.kind_of?(String) || cur_me.kind_of?(Integer))
+      if uid_or_screen_name?(pre_me) && uid_or_screen_name?(cur_me)
         friends_parallelly(pre_me).to_a - friends_parallelly(cur_me).to_a
       elsif pre_me.respond_to?(:friends) && cur_me.respond_to?(:friends)
         pre_me.friends.to_a - cur_me.friends.to_a
@@ -101,7 +101,7 @@ module ExTwitter
     end
 
     def removed(pre_me, cur_me)
-      if (pre_me.kind_of?(String) || pre_me.kind_of?(Integer)) && (cur_me.kind_of?(String) || cur_me.kind_of?(Integer))
+      if uid_or_screen_name?(pre_me) && uid_or_screen_name?(cur_me)
         followers_parallelly(pre_me).to_a - followers_parallelly(cur_me).to_a
       elsif pre_me.respond_to?(:followers) && cur_me.respond_to?(:followers)
         pre_me.followers.to_a - cur_me.followers.to_a
@@ -110,6 +110,129 @@ module ExTwitter
       end
     end
 
+    def _extract_screen_names(tweets, options = {})
+      result = tweets.map do |t|
+        $1 if t.text =~ /^(?:\.)?@(\w+)( |\W)/ # include statuses starts with .
+      end.compact
+      (options.has_key?(:uniq) && !options[:uniq]) ? result : result.uniq
+    end
 
+    # users which specified user is replying
+    # in_reply_to_user_id and in_reply_to_status_id is not used because of distinguishing mentions from replies
+    def replying(*args)
+      options = args.extract_options!
+      tweets =
+        if args.empty?
+          user_timeline(user.screen_name, options)
+        elsif uid_or_screen_name?(args[0])
+          user_timeline(args[0], options)
+        else
+          raise
+        end
+      screen_names = _extract_screen_names(tweets, options)
+      users(screen_names, {super_operation: __method__}.merge(options))
+    rescue Twitter::Error::NotFound => e
+      e.message == 'No user matches for specified terms.' ? [] : (raise e)
+    rescue => e
+      logger.warn "#{__method__} #{args.inspect} #{e.class} #{e.message}"
+      raise e
+    end
+
+    def _extract_uids(tweets, options)
+      result = tweets.map do |t|
+        t.user.id.to_i if t.text =~ /^(?:\.)?@(\w+)( |\W)/ # include statuses starts with .
+      end.compact
+      (options.has_key?(:uniq) && !options[:uniq]) ? result : result.uniq
+    end
+
+    def _extract_users(tweets, uids, options = {})
+      uids.map { |u| tweets.find { |t| t.user.id.to_i == u.to_i } }.map { |t| t.user }
+    end
+
+    # users which specified user is replied
+    # when user is login you had better to call mentions_timeline
+    def replied(*args)
+      options = args.extract_options!
+
+      if args.empty? || (uid_or_screen_name?(args[0]) && authenticating_user?(args[0]))
+        mentions_timeline.uniq { |m| m.user.id }.map { |m| m.user }
+      else
+        searched_result = search('@' + user(args[0]).screen_name, options)
+        uids = _extract_uids(searched_result, options)
+        _extract_users(searched_result, uids, options)
+      end
+    end
+
+    def _extract_inactive_users(users, options = {})
+      authorized = options.delete(:authorized)
+      two_weeks_ago = 2.weeks.ago.to_i
+      users.select do |u|
+        if authorized
+          (Time.parse(u.status.created_at).to_i < two_weeks_ago) rescue false
+        else
+          false
+        end
+      end
+    end
+
+    def inactive_friends(user = nil)
+      if user.blank?
+        _extract_inactive_users(friends_parallelly, authorized: true)
+      elsif uid_or_screen_name?(user)
+        authorized = authenticating_user?(user) || authorized_user?(user)
+        _extract_inactive_users(friends_parallelly(user), authorized: authorized)
+      elsif user.respond_to?(:friends)
+        authorized = authenticating_user?(user.uid.to_i) || authorized_user?(user.uid.to_i)
+        _extract_inactive_users(user.friends, authorized: authorized)
+      else
+        raise
+      end
+    end
+
+    def inactive_followers(user = nil)
+      if user.blank?
+        _extract_inactive_users(followers_parallelly, authorized: true)
+      elsif uid_or_screen_name?(user)
+        authorized = authenticating_user?(user) || authorized_user?(user)
+        _extract_inactive_users(followers_parallelly(user), authorized: authorized)
+      elsif user.respond_to?(:followers)
+        authorized = authenticating_user?(user.uid.to_i) || authorized_user?(user.uid.to_i)
+        _extract_inactive_users(user.followers, authorized: authorized)
+      else
+        raise
+      end
+    end
+
+    def clusters_belong_to(text)
+      return [] if text.blank?
+
+      exclude_words = JSON.parse(File.read(Rails.configuration.x.constants['cluster_bad_words_path']))
+      special_words = JSON.parse(File.read(Rails.configuration.x.constants['cluster_good_words_path']))
+
+      # クラスタ用の単語の出現回数を記録
+      cluster_word_counter =
+        special_words.map { |sw| [sw, text.scan(sw)] }
+          .delete_if { |item| item[1].empty? }
+          .each_with_object(Hash.new(1)) { |item, memo| memo[item[0]] = item[1].size }
+
+      # 同一文字種の繰り返しを見付ける。漢字の繰り返し、ひらがなの繰り返し、カタカナの繰り返し、など
+      text.scan(/[一-龠〆ヵヶ々]+|[ぁ-んー～]+|[ァ-ヴー～]+|[ａ-ｚＡ-Ｚ０-９]+|[、。！!？?]+/).
+
+        # 複数回繰り返される文字を除去
+        map { |w| w.remove /[？！?!。、ｗ]|(ー{2,})/ }.
+
+        # 文字数の少なすぎる単語、ひらがなだけの単語、除外単語を除去する
+        delete_if { |w| w.length <= 1 || (w.length <= 2 && w =~ /^[ぁ-んー～]+$/) || exclude_words.include?(w) }.
+
+        # 出現回数を記録
+        each { |w| cluster_word_counter[w] += 1 }
+
+      # 複数個以上見付かった単語のみを残し、出現頻度順にソート
+      cluster_word_counter.select { |_, v| v > 3 }.sort_by { |_, v| -v }.to_h
+    end
+
+    def clusters_assigned_to
+      raise NotImplementedError.new
+    end
   end
 end
