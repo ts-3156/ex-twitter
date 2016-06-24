@@ -32,7 +32,7 @@ module Utils
     begin
       self.call_count += 1
       _options = {method_name: method_name, call_count: self.call_count, args: args}.merge(options)
-      instrument('API Call', args[0], _options) { send(method_name, *args, options) }
+      instrument('api call', args[0], _options) { send(method_name, *args, options) }
     rescue Twitter::Error::TooManyRequests => e
       logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} Retry after #{e.rate_limit.reset_in} seconds."
       raise e
@@ -261,18 +261,15 @@ module Utils
         instrument('Cache Read(Force)', key, caller: method_name) { cache.read(key) }
       else
         if block_given?
-          if cache.exist?(key)
-            instrument('Cache Fetch', key, caller: method_name, hit: true) { cache.read(key) }
-          else
-            _d = instrument('Cache Generate', key, caller: method_name) { yield }
-            _serialized = instrument('Cache Serialize', key, caller: method_name) { encode_json(_d, method_name, options) }
-            instrument('Cache Write', key, caller: method_name) { cache.fetch(key, expires_in: 1.hour, race_condition_ttl: 5.minutes) { _serialized } }
+          cache.fetch(key, expires_in: 1.hour, race_condition_ttl: 5.minutes) do
+            _d = yield
+            instrument('serialize', key, caller: method_name) { encode_json(_d, method_name, options) }
           end
         else
-          instrument('Cache Read', key, caller: method_name, hit: cache.exist?(key)) { cache.read(key) }
+          instrument('read', key, caller: method_name, hit: cache.exist?(key)) { cache.read(key) }
         end
       end
 
-    instrument('Cache Deserialize', key, caller: method_name) { decode_json(data, method_name, options) }
+    instrument('deserialize', key, caller: method_name) { decode_json(data, method_name, options) }
   end
 end
