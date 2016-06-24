@@ -3,20 +3,35 @@ require 'active_support/core_ext'
 
 
 class LogSubscriber < ActiveSupport::LogSubscriber
-  IGNORE_PAYLOAD_NAMES = ["SCHEMA", "EXPLAIN"]
 
   def initialize
     super
     @odd = false
   end
 
+  def cache_any(event)
+    return unless logger.debug?
+
+    payload = event.payload
+    name  = "#{payload.delete(:name)} (#{event.duration.round(1)}ms)"
+    name = colorize_payload_name(name, payload[:name], AS: true)
+    debug { "#{name}: #{(payload.inspect)}" }
+  end
+
+  %w(read write fetch_hit generate delete exist?).each do |operation|
+    class_eval <<-METHOD, __FILE__, __LINE__ + 1
+        def cache_#{operation}(event)
+          event.payload[:name] = '#{operation}'
+          cache_any(event)
+        end
+    METHOD
+  end
+
   def call(event)
     return unless logger.debug?
 
     payload = event.payload
-
-    name  = "#{payload.delete(:operation)} (#{event.duration.round(1)}ms)"
-    # sql   = payload[:sql]
+    name = "#{payload.delete(:operation)} (#{event.duration.round(1)}ms)"
 
     name = colorize_payload_name(name, payload[:name])
     # sql  = color(sql, sql_color(sql), true)
@@ -27,8 +42,8 @@ class LogSubscriber < ActiveSupport::LogSubscriber
 
   private
 
-  def colorize_payload_name(name, payload_name)
-    if payload_name.blank? || payload_name == "SQL" # SQL vs Model Load/Exists
+  def colorize_payload_name(name, payload_name, options = {})
+    if options[:AS]
       color(name, MAGENTA, true)
     else
       color(name, CYAN, true)

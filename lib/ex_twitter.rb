@@ -20,7 +20,9 @@ class ExTwitter < Twitter::REST::Client
     @screen_name = options[:screen_name]
     @authenticated_user = Hashie::Mash.new({uid: options[:uid].to_i, screen_name: options[:screen_name]})
     @call_count = 0
+
     LogSubscriber.attach_to :ex_twitter
+    LogSubscriber.attach_to :active_support
     @@logger = @logger =
       if options[:logger]
         options.delete(:logger)
@@ -28,6 +30,7 @@ class ExTwitter < Twitter::REST::Client
         Dir.mkdir('log') unless File.exists?('log')
         Logger.new('log/ex_twitter.log')
       end
+
     super
   end
 
