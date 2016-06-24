@@ -5,6 +5,7 @@ require 'active_support/core_ext/string'
 require 'ex_twitter/log_subscriber'
 require 'ex_twitter/utils'
 require 'ex_twitter/existing_api'
+require 'ex_twitter/new_api'
 
 require 'twitter'
 require 'hashie'
@@ -54,73 +55,8 @@ module ExTwitter
     alias :old_favorites :favorites
     alias :old_search :search
 
-    include ExistingApi
-
-    def friends_advanced(*args)
-      options = args.extract_options!
-      _friend_ids = friend_ids(*(args + [options]))
-      users(_friend_ids.map { |id| id.to_i }, options)
-    end
-
-    def followers_advanced(*args)
-      options = args.extract_options!
-      _follower_ids = follower_ids(*(args + [options]))
-      users(_follower_ids.map { |id| id.to_i }, options)
-    end
-
-    def fetch_parallelly(signatures) # [{method: :friends, args: ['ts_3156', ...], {...}]
-      logger.debug "#{__method__} #{signatures.inspect}"
-      result = Array.new(signatures.size)
-
-      Parallel.each_with_index(signatures, in_threads: result.size) do |signature, i|
-        result[i] = send(signature[:method], *signature[:args])
-      end
-
-      result
-    end
-
-    def friends_and_followers(*args)
-      fetch_parallelly(
-        [
-          {method: 'friends_advanced', args: args},
-          {method: 'followers_advanced', args: args}])
-    end
-
-    def friends_followers_and_statuses(*args)
-      fetch_parallelly(
-        [
-          {method: 'friends_advanced', args: args},
-          {method: 'followers_advanced', args: args},
-          {method: 'user_timeline', args: args}])
-    end
-
-    def one_sided_following(me)
-      me.friends.to_a - me.followers.to_a
-    end
-
-    def one_sided_followers(me)
-      me.followers.to_a - me.friends.to_a
-    end
-
-    def mutual_friends(me)
-      me.friends.to_a & me.followers.to_a
-    end
-
-    def common_friends(me, you)
-      me.friends.to_a & you.friends.to_a
-    end
-
-    def common_followers(me, you)
-      me.followers.to_a & you.followers.to_a
-    end
-
-    def removing(pre_me, cur_me)
-      pre_me.friends.to_a - cur_me.friends.to_a
-    end
-
-    def removed(pre_me, cur_me)
-      pre_me.followers.to_a - cur_me.followers.to_a
-    end
+    include ExTwitter::ExistingApi
+    include ExTwitter::NewApi
 
     def _select_screen_names_replied(tweets, options = {})
       result = tweets.map do |t|
@@ -182,11 +118,11 @@ module ExTwitter
     end
 
     def inactive_friends(user)
-      _select_inactive_users(friends_advanced(user))
+      _select_inactive_users(friends_parallelly(user))
     end
 
     def inactive_followers(user)
-      _select_inactive_users(followers_advanced(user))
+      _select_inactive_users(followers_parallelly(user))
     end
 
     def clusters_belong_to(text)

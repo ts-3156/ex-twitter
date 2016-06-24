@@ -92,8 +92,7 @@ module ExTwitter
 
     require 'digest/md5'
 
-    # currently ignore options
-    def file_cache_key(method_name, user)
+    def file_cache_key(method_name, user, options = {})
       delim = ':'
       identifier =
         case
@@ -103,6 +102,14 @@ module ExTwitter
             "#{user.kind_of?(Integer) ? 'id' : 'sn'}#{delim}#{user.to_s}"
           when method_name == :home_timeline
             "#{user.kind_of?(Integer) ? 'id' : 'sn'}#{delim}#{user.to_s}"
+          when method_name == :users && options[:super_operation].present?
+            case
+              when user.kind_of?(Array) && user.first.kind_of?(Integer)
+                "#{options[:super_operation]}-ids#{delim}#{Digest::MD5.hexdigest(user.join(','))}"
+              when user.kind_of?(Array) && user.first.kind_of?(String)
+                "#{options[:super_operation]}-sns#{delim}#{Digest::MD5.hexdigest(user.join(','))}"
+              else raise "#{method_name.inspect} #{user.inspect}"
+            end
           when user.kind_of?(Integer)
             "id#{delim}#{user.to_s}"
           when user.kind_of?(Array) && user.first.kind_of?(Integer)
@@ -119,8 +126,8 @@ module ExTwitter
       "#{method_name}#{delim}#{identifier}"
     end
 
-    def namespaced_key(method_name, user)
-      file_cache_key(method_name, user)
+    def namespaced_key(method_name, user, options = {})
+      file_cache_key(method_name, user, options)
     end
 
     PROFILE_SAVE_KEYS = %i(
@@ -203,7 +210,7 @@ module ExTwitter
           when :user # Twitter::User
             JSON.pretty_generate(obj.to_hash.slice(*PROFILE_SAVE_KEYS))
 
-          when :users, :friends_advanced, :followers_advanced # Twitter::User
+          when :users, :friends_parallelly, :followers_parallelly # Twitter::User
             data =
               if options[:reduce]
                 obj.map { |o| o.to_hash.slice(*PROFILE_SAVE_KEYS) }
@@ -254,7 +261,7 @@ module ExTwitter
     end
 
     def fetch_cache_or_call_api(method_name, user, options = {})
-      key = namespaced_key(method_name, user)
+      key = namespaced_key(method_name, user, options)
       options.update(key: key)
 
       data =
