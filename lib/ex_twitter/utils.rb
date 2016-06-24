@@ -2,24 +2,24 @@ module ExTwitter
   module Utils
     # for backward compatibility
     def uid
-      @uid
+      user.id
     end
 
     def __uid
-      @uid
+      uid
     end
 
     def __uid_i
-      @uid.to_i
+      uid.to_i
     end
 
     # for backward compatibility
     def screen_name
-      @screen_name
+      user.screen_name
     end
 
     def __screen_name
-      @screen_name
+      screen_name
     end
 
     def instrument(operation, key, options = nil)
@@ -58,13 +58,13 @@ module ExTwitter
     # user_timeline, search
     def collect_with_max_id(method_name, *args)
       options = args.extract_options!
-      options[:call_count] = 3 unless options.has_key?(:call_count)
+      call_limit = options.delete(:call_limit) || 3
       last_response = call_old_method(method_name, *args, options)
       last_response = yield(last_response) if block_given?
       return_data = last_response
       call_count = 1
 
-      while last_response.any? && call_count < options[:call_count]
+      while last_response.any? && call_count < call_limit
         options[:max_id] = last_response.last.kind_of?(Hash) ? last_response.last[:id] : last_response.last.id
         last_response = call_old_method(method_name, *args, options)
         last_response = yield(last_response) if block_given?
@@ -100,9 +100,9 @@ module ExTwitter
           when method_name == :search
             "str#{delim}#{user.to_s}"
           when method_name == :mentions_timeline
-            "myself#{delim}#{user.to_s}"
+            "#{user.kind_of?(Integer) ? 'id' : 'sn'}#{delim}#{user.to_s}"
           when method_name == :home_timeline
-            "myself#{delim}#{user.to_s}"
+            "#{user.kind_of?(Integer) ? 'id' : 'sn'}#{delim}#{user.to_s}"
           when user.kind_of?(Integer)
             "id#{delim}#{user.to_s}"
           when user.kind_of?(Array) && user.first.kind_of?(Integer)
@@ -261,13 +261,9 @@ module ExTwitter
         if options[:cache] == :read
           instrument('Cache Read(Force)', key, caller: method_name) { cache.read(key) }
         else
-          if block_given?
-            cache.fetch(key, expires_in: 1.hour, race_condition_ttl: 5.minutes) do
-              _d = yield
-              instrument('serialize', key, caller: method_name) { encode_json(_d, method_name, options) }
-            end
-          else
-            instrument('read', key, caller: method_name, hit: cache.exist?(key)) { cache.read(key) }
+          cache.fetch(key, expires_in: 1.hour, race_condition_ttl: 5.minutes) do
+            _d = yield
+            instrument('serialize', key, caller: method_name) { encode_json(_d, method_name, options) }
           end
         end
 

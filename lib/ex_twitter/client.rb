@@ -14,9 +14,6 @@ module ExTwitter
   class Client < Twitter::REST::Client
     def initialize(options = {})
       @cache = ActiveSupport::Cache::FileStore.new(File.join('tmp', 'api_cache'))
-      @uid = options[:uid]
-      @screen_name = options[:screen_name]
-      @authenticated_user = Hashie::Mash.new({uid: options[:uid].to_i, screen_name: options[:screen_name]})
       @call_count = 0
 
       ExTwitter::LogSubscriber.attach_to :ex_twitter
