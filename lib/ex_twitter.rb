@@ -1,4 +1,4 @@
-requir 'ex_twitter/client'
+require 'ex_twitter/client'
 
 module ExTwitter
 end
