@@ -17,6 +17,9 @@ module ExTwitter
       @cache = ActiveSupport::Cache::FileStore.new(File.join('tmp', 'api_cache'))
       @call_count = 0
 
+      @uid = options.has_key?(:uid) ? options.delete(:uid).to_i : nil
+      @screen_name = options.has_key?(:screen_name) ? options.delete(:screen_name).to_s : nil
+
       ExTwitter::LogSubscriber.attach_to :ex_twitter
       ExTwitter::LogSubscriber.attach_to :active_support
       @@logger = @logger =
@@ -41,6 +44,7 @@ module ExTwitter
 
     include ExTwitter::Utils
 
+    alias :old_verify_credentials :verify_credentials
     alias :old_friendship? :friendship?
     alias :old_user? :user?
     alias :old_user :user

@@ -1,5 +1,12 @@
 module ExTwitter
   module ExistingApi
+    def verify_credentials(*args)
+      options = {skip_status: true}.merge(args.extract_options!)
+      fetch_cache_or_call_api(__method__, args) {
+        call_old_method("old_#{__method__}", *args, options)
+      }
+    end
+
     def friendship?(*args)
       options = args.extract_options!
       fetch_cache_or_call_api(__method__, args) {

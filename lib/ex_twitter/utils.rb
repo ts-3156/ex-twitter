@@ -2,7 +2,7 @@ module ExTwitter
   module Utils
     # for backward compatibility
     def uid
-      user.id
+      @uid || user.id.to_i
     end
 
     def __uid
@@ -10,12 +10,12 @@ module ExTwitter
     end
 
     def __uid_i
-      uid.to_i
+      uid
     end
 
     # for backward compatibility
     def screen_name
-      user.screen_name
+      @screen_name || user.screen_name
     end
 
     def __screen_name
@@ -109,6 +109,8 @@ module ExTwitter
       delim = ':'
       identifier =
         case
+          when method_name == :verify_credentials
+            "object-id#{delim}#{object_id}"
           when method_name == :search
             "str#{delim}#{user.to_s}"
           when method_name == :mentions_timeline
@@ -219,6 +221,9 @@ module ExTwitter
 
           when :friend_ids, :follower_ids # Integer
             JSON.pretty_generate(obj)
+
+          when :verify_credentials # Twitter::User
+            JSON.pretty_generate(obj.to_hash.slice(*PROFILE_SAVE_KEYS))
 
           when :user # Twitter::User
             JSON.pretty_generate(obj.to_hash.slice(*PROFILE_SAVE_KEYS))
