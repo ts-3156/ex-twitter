@@ -134,7 +134,7 @@ module ExTwitter
       screen_names = _extract_screen_names(tweets)
       result = users(screen_names, {super_operation: __method__}.merge(options))
       if options.has_key?(:uniq) && !options[:uniq]
-        screen_names.map { |sn| result.find { |r| r.screen_name == sn } }
+        screen_names.map { |sn| result.find { |r| r.screen_name == sn } }.compact
       else
         result.uniq { |r| r.id }
       end
