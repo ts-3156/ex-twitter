@@ -6,10 +6,16 @@ module ExTwitter
     end
 
     def __uid
+      ActiveSupport::Deprecation.warn(<<-MESSAGE.strip_heredoc)
+        `ExTwitter::Utils#__uid` is deprecated.
+      MESSAGE
       uid
     end
 
     def __uid_i
+      ActiveSupport::Deprecation.warn(<<-MESSAGE.strip_heredoc)
+        `ExTwitter::Utils#__uid_i` is deprecated.
+      MESSAGE
       uid
     end
 
@@ -19,6 +25,9 @@ module ExTwitter
     end
 
     def __screen_name
+      ActiveSupport::Deprecation.warn(<<-MESSAGE.strip_heredoc)
+        `ExTwitter::Utils#__screen_name` is deprecated.
+      MESSAGE
       screen_name
     end
 
