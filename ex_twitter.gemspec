@@ -21,5 +21,5 @@ Gem::Specification.new do |spec|
   spec.require_paths = %w[lib]
   spec.summary = spec.description
   spec.test_files = Dir.glob('spec/**/*')
-  spec.version = '0.2.5'
+  spec.version = '0.3.0'
 end
