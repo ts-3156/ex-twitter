@@ -126,6 +126,8 @@ module ExTwitter
           user_timeline(user.screen_name, options)
         elsif uid_or_screen_name?(args[0])
           user_timeline(args[0], options)
+        elsif args[0].kind_of?(Array) && args[0].all? { |t| t.respond_to?(:text) }
+          args[0]
         else
           raise
         end
