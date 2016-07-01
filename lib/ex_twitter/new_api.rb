@@ -110,11 +110,10 @@ module ExTwitter
       end
     end
 
-    def _extract_screen_names(tweets, options = {})
-      result = tweets.map do |t|
+    def _extract_screen_names(tweets)
+      tweets.map do |t|
         $1 if t.text =~ /^(?:\.)?@(\w+)( |\W)/ # include statuses starts with .
       end.compact
-      (options.has_key?(:uniq) && !options[:uniq]) ? result : result.uniq
     end
 
     # users which specified user is replying
@@ -123,7 +122,7 @@ module ExTwitter
       options = args.extract_options!
       tweets =
         if args.empty?
-          user_timeline(user.screen_name, options)
+          user_timeline(options)
         elsif uid_or_screen_name?(args[0])
           user_timeline(args[0], options)
         elsif args[0].kind_of?(Array) && args[0].all? { |t| t.respond_to?(:text) }
@@ -131,8 +130,14 @@ module ExTwitter
         else
           raise
         end
-      screen_names = _extract_screen_names(tweets, options)
-      users(screen_names, {super_operation: __method__}.merge(options))
+
+      screen_names = _extract_screen_names(tweets)
+      result = users(screen_names, {super_operation: __method__}.merge(options))
+      if options.has_key?(:uniq) && !options[:uniq]
+        screen_names.map { |sn| result.find { |r| r.screen_name == sn } }
+      else
+        result.uniq { |r| r.id }
+      end
     rescue Twitter::Error::NotFound => e
       e.message == 'No user matches for specified terms.' ? [] : (raise e)
     rescue => e
@@ -140,15 +145,14 @@ module ExTwitter
       raise e
     end
 
-    def _extract_uids(tweets, options)
-      result = tweets.map do |t|
+    def _extract_uids(tweets)
+      tweets.map do |t|
         t.user.id.to_i if t.text =~ /^(?:\.)?@(\w+)( |\W)/ # include statuses starts with .
       end.compact
-      (options.has_key?(:uniq) && !options[:uniq]) ? result : result.uniq
     end
 
-    def _extract_users(tweets, uids, options = {})
-      uids.map { |u| tweets.find { |t| t.user.id.to_i == u.to_i } }.map { |t| t.user }
+    def _extract_users(tweets, uids)
+      uids.map { |uid| tweets.find { |t| t.user.id.to_i == uid.to_i } }.map { |t| t.user }.compact
     end
 
     # users which specified user is replied
@@ -156,13 +160,61 @@ module ExTwitter
     def replied(*args)
       options = args.extract_options!
 
-      if args.empty? || (uid_or_screen_name?(args[0]) && authenticating_user?(args[0]))
-        mentions_timeline.uniq { |m| m.user.id }.map { |m| m.user }
+      result =
+        if args.empty? || (uid_or_screen_name?(args[0]) && authenticating_user?(args[0]))
+          mentions_timeline.map { |m| m.user }
+        else
+          searched_result = search('@' + user(args[0]).screen_name, options)
+          uids = _extract_uids(searched_result)
+          _extract_users(searched_result, uids)
+        end
+
+      if options.has_key?(:uniq) && !options[:uniq]
+        result
       else
-        searched_result = search('@' + user(args[0]).screen_name, options)
-        uids = _extract_uids(searched_result, options)
-        _extract_users(searched_result, uids, options)
+        result.uniq { |r| r.id }
       end
+    end
+
+    def _count_users_with_two_sided_threshold(users, options)
+      min = options.has_key?(:min) ? options[:min] : 0
+      max = options.has_key?(:max) ? options[:max] : 1000
+      users.each_with_object(Hash.new(0)) { |u, memo| memo[u.id] += 1 }.
+        select { |_k, v| min <= v && v <= max }.
+        sort_by { |_, v| -v }.to_h
+    end
+
+    def _extract_favorite_users(favs, options = {})
+      counted_value = _count_users_with_two_sided_threshold(favs.map { |t| t.user }, options)
+      counted_value.map do |uid, cnt|
+        fav = favs.find { |f| f.user.id.to_i == uid.to_i }
+        Array.new(cnt, fav.user)
+      end.flatten
+    end
+
+    def favoriting(*args)
+      options = args.extract_options!
+
+      favs =
+        if args.empty?
+          favorites(options)
+        elsif uid_or_screen_name?(args[0])
+          favorites(args[0], options)
+        elsif args[0].kind_of?(Array) && args[0].all? { |t| t.respond_to?(:text) }
+          args[0]
+        else
+          raise
+        end
+
+      result = _extract_favorite_users(favs, options)
+      if options.has_key?(:uniq) && !options[:uniq]
+        result
+      else
+        result.uniq { |r| r.id }
+      end
+    rescue => e
+      logger.warn "#{__method__} #{user.inspect} #{e.class} #{e.message}"
+      raise e
     end
 
     def _extract_inactive_users(users, options = {})
@@ -174,6 +226,45 @@ module ExTwitter
         else
           false
         end
+      end
+    end
+
+    def favorited_by(*args)
+    end
+
+    def close_friends(*args)
+      options = {uniq: false}.merge(args.extract_options!)
+      min_max = {
+        min: options.has_key?(:min) ? options.delete(:min) : 0,
+        max: options.has_key?(:max) ? options.delete(:max) : 1000
+      }
+
+      _replying, _replied, _favoriting =
+        if args.empty?
+          [replying(options), replied(options), favoriting(options)]
+        elsif uid_or_screen_name?(args[0])
+          [replying(args[0], options), replied(args[0], options), favoriting(args[0], options)]
+        elsif (m_names = %i(replying replied favoriting)).all? { |m_name| args[0].respond_to?(m_name) }
+          m_names.map { |mn| args[0].send(mn) }
+        else
+          raise
+        end
+
+      _users = _replying + _replied + _favoriting
+      return [] if _users.empty?
+
+      scores = _count_users_with_two_sided_threshold(_users, min_max)
+      replying_scores = _count_users_with_two_sided_threshold(_replying, min_max)
+      replied_scores = _count_users_with_two_sided_threshold(_replied, min_max)
+      favoriting_scores = _count_users_with_two_sided_threshold(_favoriting, min_max)
+
+      scores.keys.map { |uid| _users.find { |u| u.id.to_i == uid.to_i } }.
+        map do |u|
+        u[:score] = scores[u.id]
+        u[:replying_score] = replying_scores[u.id]
+        u[:replied_score] = replied_scores[u.id]
+        u[:favoriting_score] = favoriting_scores[u.id]
+        u
       end
     end
 

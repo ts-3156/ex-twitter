@@ -68,6 +68,7 @@ module ExTwitter
 
     # use compact, not use sort and uniq
     # specify reduce: false to use tweet for inactive_*
+    # TODO Perhaps `old_users` automatically merges result...
     def users(*args)
       options = args.extract_options!
       options[:reduce] = false
@@ -83,14 +84,11 @@ module ExTwitter
       end
 
       processed_users.sort_by{|p| p[:i] }.map{|p| p[:users] }.flatten.compact
-    rescue => e # debug
-      logger.warn "#{__method__}: #{args.inspect} #{e.class} #{e.message}"
-      raise e
     end
 
     def home_timeline(*args)
       options = {count: 200, include_rts: true, call_limit: 3}.merge(args.extract_options!)
-      fetch_cache_or_call_api(__method__, user.screen_name, options) {
+      fetch_cache_or_call_api(__method__, user.id, options) {
         collect_with_max_id("old_#{__method__}", options)
       }
     end
@@ -105,7 +103,7 @@ module ExTwitter
 
     def mentions_timeline(*args)
       options = {count: 200, include_rts: true, call_limit: 1}.merge(args.extract_options!)
-      fetch_cache_or_call_api(__method__, user.screen_name, options) {
+      fetch_cache_or_call_api(__method__, user.id, options) {
         collect_with_max_id("old_#{__method__}", options)
       }
     end
