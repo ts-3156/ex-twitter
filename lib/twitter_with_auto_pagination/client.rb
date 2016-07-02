@@ -20,13 +20,15 @@ module TwitterWithAutoPagination
       @uid = options.has_key?(:uid) ? options.delete(:uid).to_i : nil
       @screen_name = options.has_key?(:screen_name) ? options.delete(:screen_name).to_s : nil
 
-      @@logger = @logger =
-        if options[:logger]
+      logger =
+        if options.has_key?(:logger)
           options.delete(:logger)
         else
           Dir.mkdir('log') unless File.exists?('log')
           Logger.new('log/twitter_with_auto_pagination.log')
         end
+      logger.level = options.has_key?(:log_level) ? options.delete(:log_level) : :debug
+      @@logger = @logger = logger
 
       super
     end
