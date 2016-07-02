@@ -205,86 +205,82 @@ module ExTwitter
     # encode
     def encode_json(obj, caller_name, options = {})
       options[:reduce] = true unless options.has_key?(:reduce)
-      result =
-        case caller_name
-          when :user_timeline, :home_timeline, :mentions_timeline, :favorites # Twitter::Tweet
-            JSON.pretty_generate(obj.map { |o| o.attrs })
+      case caller_name
+        when :user_timeline, :home_timeline, :mentions_timeline, :favorites # Twitter::Tweet
+          JSON.pretty_generate(obj.map { |o| o.attrs })
 
-          when :search # Hash
-            data =
-              if options[:reduce]
-                obj.map { |o| o.to_hash.slice(*STATUS_SAVE_KEYS) }
-              else
-                obj.map { |o| o.to_hash }
-              end
-            JSON.pretty_generate(data)
+        when :search # Hash
+          data =
+            if options[:reduce]
+              obj.map { |o| o.to_hash.slice(*STATUS_SAVE_KEYS) }
+            else
+              obj.map { |o| o.to_hash }
+            end
+          JSON.pretty_generate(data)
 
-          when :friends, :followers # Hash
-            data =
-              if options[:reduce]
-                obj.map { |o| o.to_hash.slice(*PROFILE_SAVE_KEYS) }
-              else
-                obj.map { |o| o.to_hash }
-              end
-            JSON.pretty_generate(data)
+        when :friends, :followers # Hash
+          data =
+            if options[:reduce]
+              obj.map { |o| o.to_hash.slice(*PROFILE_SAVE_KEYS) }
+            else
+              obj.map { |o| o.to_hash }
+            end
+          JSON.pretty_generate(data)
 
-          when :friend_ids, :follower_ids # Integer
-            JSON.pretty_generate(obj)
+        when :friend_ids, :follower_ids # Integer
+          JSON.pretty_generate(obj)
 
-          when :verify_credentials # Twitter::User
-            JSON.pretty_generate(obj.to_hash.slice(*PROFILE_SAVE_KEYS))
+        when :verify_credentials # Twitter::User
+          JSON.pretty_generate(obj.to_hash.slice(*PROFILE_SAVE_KEYS))
 
-          when :user # Twitter::User
-            JSON.pretty_generate(obj.to_hash.slice(*PROFILE_SAVE_KEYS))
+        when :user # Twitter::User
+          JSON.pretty_generate(obj.to_hash.slice(*PROFILE_SAVE_KEYS))
 
-          when :users, :friends_parallelly, :followers_parallelly # Twitter::User
-            data =
-              if options[:reduce]
-                obj.map { |o| o.to_hash.slice(*PROFILE_SAVE_KEYS) }
-              else
-                obj.map { |o| o.to_hash }
-              end
-            JSON.pretty_generate(data)
+        when :users, :friends_parallelly, :followers_parallelly # Twitter::User
+          data =
+            if options[:reduce]
+              obj.map { |o| o.to_hash.slice(*PROFILE_SAVE_KEYS) }
+            else
+              obj.map { |o| o.to_hash }
+            end
+          JSON.pretty_generate(data)
 
-          when :user? # true or false
-            obj
+        when :user? # true or false
+          obj
 
-          when :friendship? # true or false
-            obj
+        when :friendship? # true or false
+          obj
 
-          else
-            raise "#{__method__}: caller=#{caller_name} key=#{options[:key]} obj=#{obj.inspect}"
-        end
-      result
+        else
+          raise "#{__method__}: caller=#{caller_name} key=#{options[:key]} obj=#{obj.inspect}"
+      end
     end
 
     # decode
     def decode_json(json_str, caller_name, options = {})
       obj = json_str.kind_of?(String) ? JSON.parse(json_str) : json_str
-      result =
-        case
-          when obj.nil?
-            obj
+      case
+        when obj.nil?
+          obj
 
-          when obj.kind_of?(Array) && obj.first.kind_of?(Hash)
-            obj.map { |o| Hashie::Mash.new(o) }
+        when obj.kind_of?(Array) && obj.first.kind_of?(Hash)
+          obj.map { |o| Hashie::Mash.new(o) }
 
-          when obj.kind_of?(Array) && obj.first.kind_of?(Integer)
-            obj
+        when obj.kind_of?(Array) && obj.first.kind_of?(Integer)
+          obj
 
-          when obj.kind_of?(Hash)
-            Hashie::Mash.new(obj)
+        when obj.kind_of?(Hash)
+          Hashie::Mash.new(obj)
 
-          when obj === true || obj === false
-            obj
+        when obj === true || obj === false
+          obj
 
-          when obj.kind_of?(Array) && obj.empty?
-            obj
+        when obj.kind_of?(Array) && obj.empty?
+          obj
 
-          else
-            raise "#{__method__}: caller=#{caller_name} key=#{options[:key]} obj=#{obj.inspect}"
-        end
-      result
+        else
+          raise "#{__method__}: caller=#{caller_name} key=#{options[:key]} obj=#{obj.inspect}"
+      end
     end
 
     def fetch_cache_or_call_api(method_name, user, options = {})
