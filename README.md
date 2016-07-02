@@ -4,7 +4,7 @@ twitter-with-auto-pagination
 [![Gem Version](https://badge.fury.io/rb/ex_twitter.png)](https://badge.fury.io/rb/twitter_with_auto_pagination)
 [![Build Status](https://travis-ci.org/ts-3156/ex-twitter.svg?branch=master)](https://travis-ci.org/ts-3156/twitter-with-auto-pagination)
 
-Add auto paginate feature to Twitter gem.
+Add auto pagination, auto caching and parallelly fetching features to Twitter gem.
 
 ## Installation
 
@@ -20,7 +20,9 @@ Add `twitter_with_auto_pagination` to your Gemfile, and bundle.
 
 ## Features
 
-* Auto paginate feature
+* Auto pagination
+* Auto caching
+* Parallelly fetching
 
 ## Configuration
 
@@ -39,108 +41,111 @@ end
 
 ## Usage Examples
 
-### Existing API
+After configuring a `client`, you can do the following things.
+
+### Pre-existing and enhanced APIs
+
+Fetch the timeline of Tweets (by screen name or user ID, or by implicit authenticated user)
 
 ```
-tweets = client.user_timeline
+client.user_timeline('gem')
+client.user_timeline(213747670)
+client.user_timeline
 
-tweets.size
+result.size
 # => 588
 
-tweet = tweets.first
-tweet.text
-# => "Your Tweet..."
+result.first.text
+# => "Your tweet text..."
 
-tweet.user.screen_name
+result.first.user.screen_name
 # => "your_screen_name"
 ```
 
+Fetch the timeline of Tweets from the authenticated user's home page
+
 ```
-tweets = client.home_timeline
-tweets.size
-# => 475
+client.home_timeline
+```
+
+Fetch the timeline of Tweets mentioning the authenticated user
+
+```
+client.mentions_timeline
+```
+
+Fetch all friends's user IDs (by screen name or user ID, or by implicit authenticated user)
+
+```
+client.friend_ids('gem')
+client.friend_ids(213747670)
+client.friend_ids
+```
+
+Fetch all followers's user IDs (by screen name or user ID, or by implicit authenticated user)
+
+```
+client.follower_ids('gem')
+client.follower_ids(213747670)
+client.follower_ids
+```
+
+Fetch all friends with profile details (by screen name or user ID, or by implicit authenticated user)
+
+```
+client.friends('gem')
+client.friends(213747670)
+client.friends
+```
+
+Fetch all followers with profile details (by screen name or user ID, or by implicit authenticated user)
+
+```
+client.followers('gem')
+client.followers(213747670)
+client.followers
+```
+
+Other APIs(e.g. `favorites`, `search`) also have auto pagination feature. 
+
+### New APIs
+
+```
+client.mutual_friends
 ```
 
 ```
-tweets = client.mentions_timeline
-tweets.size
-# => xxx
+client.one_sided_friends
 ```
 
 ```
-friend_ids = client.friend_ids
-friend_ids.size
-# => 350
+client.one_sided_followers
 ```
 
 ```
-follower_ids = client.follower_ids
-follower_ids.size
-# => 928
+client.common_friends(me, you)
 ```
 
 ```
-friends = client.friends
-friends.size
-# => 350
+client.common_followers(me, you)
 ```
 
 ```
-followers = client.followers
-followers.size
-# => 928
+client.close_friends
 ```
 
 ```
-tweets = client.favorites
-favorites.size
-# => xxx
+client.removed(pre_me, cur_me)
 ```
 
 ```
-tweets = client.search('twitter')
-tweets.size
-# => xxx
+client.removed_by(pre_me, cur_me)
 ```
 
 ```
-users = client.users(['screen_name_1', 'sn_2', 'sn_3'])
-users.size
-# => 3
-```
-
-### New API
-
-```
-mutual_friends = client.mutual_friends
-mutual_friends.size
-# => xxx
+client.replied
 ```
 
 ```
-one_sided_friends = client.one_sided_friends
-one_sided_friends.size
-# => xxx
-```
-
-```
-one_sided_followers = client.one_sided_followers
-one_sided_followers.size
-# => xxx
-```
-
-Users which authorized user removed.
-
-```
-users = client.removed(pre_me, cur_me)
-users.size
-# => xxx
-```
-
-Users which authorized user is removed by.
-
-```
-users = client.removed_by(pre_me, cur_me)
-users.size
-# => xxx
+client.replied_by
 ```
