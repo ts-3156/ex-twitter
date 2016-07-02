@@ -22,4 +22,5 @@ Gemfile.lock
 /.idea
 .DS_Store
 .pryrc
+.editorconfig
 .rbenv-gemsets

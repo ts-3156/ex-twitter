@@ -1,8 +1,8 @@
-ex-twitter
-==========
+twitter-with-auto-pagination
+============================
 
-[![Gem Version](https://badge.fury.io/rb/ex_twitter.png)](https://badge.fury.io/rb/ex_twitter)
-[![Build Status](https://travis-ci.org/ts-3156/ex-twitter.svg?branch=master)](https://travis-ci.org/ts-3156/ex-twitter)
+[![Gem Version](https://badge.fury.io/rb/ex_twitter.png)](https://badge.fury.io/rb/twitter_with_auto_pagination)
+[![Build Status](https://travis-ci.org/ts-3156/ex-twitter.svg?branch=master)](https://travis-ci.org/ts-3156/twitter-with-auto-pagination)
 
 Add auto paginate feature to Twitter gem.
 
@@ -11,12 +11,12 @@ Add auto paginate feature to Twitter gem.
 ### Gem
 
 ```
-gem install ex_twitter
+gem install twitter_with_auto_pagination
 ```
 
 ### Rails
 
-Add ex_twitter to your Gemfile, and bundle.
+Add twitter_with_auto_pagination to your Gemfile, and bundle.
 
 ## Features
 
@@ -24,10 +24,10 @@ Add ex_twitter to your Gemfile, and bundle.
 
 ## Configuration
 
-You can pass configuration options as a block to `ExTwitter.new` just like `Twitter::REST::Client.new`.
+You can pass configuration options as a block to `TwitterWithAutoPagination::Client.new` just like `Twitter::REST::Client.new`.
 
 ```
-client = ExTwitter.new do |config|
+client = TwitterWithAutoPagination::Client.new do |config|
   config.consumer_key        = "YOUR_CONSUMER_KEY"
   config.consumer_secret     = "YOUR_CONSUMER_SECRET"
   config.access_token        = "YOUR_ACCESS_TOKEN"
@@ -35,18 +35,32 @@ client = ExTwitter.new do |config|
 end
 ```
 
-You can pass advanced configuration options as a block to `ExTwitter.new`.
-
-```
-client = ExTwitter.new do |config|
-  config.auto_paginate = true
-  config.max_retries   = 1
-  config.max_paginates = 3
-end
-```
-
 ## Usage Examples
 
 ```
-client.user_timeline
+result = client.user_timeline
+
+result.size
+# => 588
+
+result.first.text
+# => "..."
+```
+
+```
+result = client.home_timeline
+result.size
+# => 475
+```
+
+```
+result = client.friends
+result.size
+# => 350
+```
+
+```
+result = client.followers
+result.size
+# => 928
 ```
