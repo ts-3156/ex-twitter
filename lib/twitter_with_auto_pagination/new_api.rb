@@ -37,8 +37,10 @@ module TwitterWithAutoPagination
           {method: :user_timeline, args: args}])
     end
 
-    def one_sided_friends(me)
-      if uid_or_screen_name?(me)
+    def one_sided_friends(me = nil)
+      if me.nil?
+        friends_parallelly.to_a - followers_parallelly.to_a
+      elsif uid_or_screen_name?(me)
         # TODO use friends_and_followers
         friends_parallelly(me).to_a - followers_parallelly(me).to_a
       elsif me.respond_to?(:friends) && me.respond_to?(:followers)
@@ -48,8 +50,10 @@ module TwitterWithAutoPagination
       end
     end
 
-    def one_sided_followers(me)
-      if uid_or_screen_name?(me)
+    def one_sided_followers(me = nil)
+      if me.nil?
+        followers_parallelly.to_a - friends_parallelly.to_a
+      elsif uid_or_screen_name?(me)
         # TODO use friends_and_followers
         followers_parallelly(me).to_a - friends_parallelly(me).to_a
       elsif me.respond_to?(:friends) && me.respond_to?(:followers)
@@ -59,8 +63,10 @@ module TwitterWithAutoPagination
       end
     end
 
-    def mutual_friends(me)
-      if uid_or_screen_name?(me)
+    def mutual_friends(me = nil)
+      if me.nil?
+        friends_parallelly.to_a & followers_parallelly.to_a
+      elsif uid_or_screen_name?(me)
         # TODO use friends_and_followers
         friends_parallelly(me).to_a & followers_parallelly(me).to_a
       elsif me.respond_to?(:friends) && me.respond_to?(:followers)
