@@ -20,8 +20,6 @@ module ExTwitter
       @uid = options.has_key?(:uid) ? options.delete(:uid).to_i : nil
       @screen_name = options.has_key?(:screen_name) ? options.delete(:screen_name).to_s : nil
 
-      ExTwitter::LogSubscriber.attach_to :ex_twitter
-      ExTwitter::LogSubscriber.attach_to :active_support
       @@logger = @logger =
         if options[:logger]
           options.delete(:logger)

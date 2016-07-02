@@ -77,3 +77,6 @@ module ExTwitter
     end
   end
 end
+
+ExTwitter::LogSubscriber.attach_to :ex_twitter
+ExTwitter::LogSubscriber.attach_to :active_support
