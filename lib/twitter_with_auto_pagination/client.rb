@@ -2,16 +2,16 @@ require 'active_support'
 require 'active_support/cache'
 require 'active_support/core_ext/string'
 
-require 'ex_twitter/log_subscriber'
-require 'ex_twitter/utils'
-require 'ex_twitter/existing_api'
-require 'ex_twitter/new_api'
+require 'twitter_with_auto_pagination/log_subscriber'
+require 'twitter_with_auto_pagination/utils'
+require 'twitter_with_auto_pagination/existing_api'
+require 'twitter_with_auto_pagination/new_api'
 
 require 'twitter'
 require 'hashie'
 require 'parallel'
 
-module ExTwitter
+module TwitterWithAutoPagination
   class Client < Twitter::REST::Client
     def initialize(options = {})
       @cache = ActiveSupport::Cache::FileStore.new(File.join('tmp', 'api_cache'))
@@ -25,7 +25,7 @@ module ExTwitter
           options.delete(:logger)
         else
           Dir.mkdir('log') unless File.exists?('log')
-          Logger.new('log/ex_twitter.log')
+          Logger.new('log/twitter_with_auto_pagination.log')
         end
 
       super
@@ -40,7 +40,7 @@ module ExTwitter
 
     INDENT = 4
 
-    include ExTwitter::Utils
+    include TwitterWithAutoPagination::Utils
 
     alias :old_verify_credentials :verify_credentials
     alias :old_friendship? :friendship?
@@ -57,8 +57,8 @@ module ExTwitter
     alias :old_favorites :favorites
     alias :old_search :search
 
-    include ExTwitter::ExistingApi
-    include ExTwitter::NewApi
+    include TwitterWithAutoPagination::ExistingApi
+    include TwitterWithAutoPagination::NewApi
 
     def usage_stats_wday_series_data(times)
       wday_count = times.each_with_object((0..6).map { |n| [n, 0] }.to_h) do |time, memo|

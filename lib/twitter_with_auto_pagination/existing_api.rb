@@ -1,4 +1,4 @@
-module ExTwitter
+module TwitterWithAutoPagination
   module ExistingApi
     def verify_credentials(*args)
       options = {skip_status: true}.merge(args.extract_options!)

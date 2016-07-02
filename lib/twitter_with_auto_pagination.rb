@@ -1,0 +1,4 @@
+require 'twitter_with_auto_pagination/client'
+
+module TwitterWithAutoPagination
+end

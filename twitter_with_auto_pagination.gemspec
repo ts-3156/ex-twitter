@@ -12,12 +12,12 @@ Gem::Specification.new do |spec|
   spec.authors = ['Shinohara Teruki']
   spec.description = %q(Add auto paginate feature to Twitter gem.)
   spec.email = %w[ts_3156@yahoo.co.jp]
-  spec.files = %w[LICENSE.md README.md Rakefile ex_twitter.gemspec]
+  spec.files = %w[LICENSE.md README.md Rakefile twitter_with_auto_pagination.gemspec]
   spec.files += Dir.glob('lib/**/*.rb')
   spec.files += Dir.glob('spec/**/*')
-  spec.homepage = 'http://github.com/ts-3156/ex-twitter/'
+  spec.homepage = 'http://github.com/ts-3156/twitter_with_auto_pagination/'
   spec.licenses = %w[MIT]
-  spec.name = 'ex_twitter'
+  spec.name = 'twitter_with_auto_pagination'
   spec.require_paths = %w[lib]
   spec.summary = spec.description
   spec.test_files = Dir.glob('spec/**/*')

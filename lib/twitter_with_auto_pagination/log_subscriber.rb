@@ -2,7 +2,7 @@ require 'active_support'
 require 'active_support/core_ext'
 
 
-module ExTwitter
+module TwitterWithAutoPagination
   class LogSubscriber < ActiveSupport::LogSubscriber
 
     def initialize
@@ -73,10 +73,10 @@ module ExTwitter
     end
 
     def logger
-      ExTwitter::Client.logger
+      TwitterWithAutoPagination::Client.logger
     end
   end
 end
 
-ExTwitter::LogSubscriber.attach_to :ex_twitter
-ExTwitter::LogSubscriber.attach_to :active_support
+TwitterWithAutoPagination::LogSubscriber.attach_to :twitter_with_auto_pagination
+TwitterWithAutoPagination::LogSubscriber.attach_to :active_support

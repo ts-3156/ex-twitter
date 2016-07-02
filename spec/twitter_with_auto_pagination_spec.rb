@@ -1,6 +1,6 @@
 require 'helper'
 
-describe ExTwitter do
+describe TwitterWithAutoPagination do
   let(:config) {
     {
       consumer_key: 'CK',
@@ -9,7 +9,7 @@ describe ExTwitter do
       access_token_secret: 'ATS',
     }
   }
-  let(:client) { ExTwitter.new(config) }
+  let(:client) { TwitterWithAutoPagination::Client.new(config) }
 
   describe '#initialize' do
     let(:default_call_count) { 0 }

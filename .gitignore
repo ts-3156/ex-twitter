@@ -19,9 +19,7 @@ _yardoc
 doc/
 
 Gemfile.lock
-ex_twitter_cache
 /.idea
 .DS_Store
 .pryrc
 .rbenv-gemsets
-/config/twitter.yml

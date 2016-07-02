@@ -1,4 +1,4 @@
-require 'ex_twitter'
+require 'twitter_with_auto_pagination'
 require 'rspec'
 
 RSpec.configure do |config|

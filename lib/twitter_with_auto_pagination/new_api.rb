@@ -1,4 +1,4 @@
-module ExTwitter
+module TwitterWithAutoPagination
   module NewApi
     def friends_parallelly(*args)
       options = {super_operation: __method__}.merge(args.extract_options!)

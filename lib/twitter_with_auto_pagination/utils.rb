@@ -1,4 +1,4 @@
-module ExTwitter
+module TwitterWithAutoPagination
   module Utils
     # for backward compatibility
     def uid
@@ -7,14 +7,14 @@ module ExTwitter
 
     def __uid
       ActiveSupport::Deprecation.warn(<<-MESSAGE.strip_heredoc)
-        `ExTwitter::Utils#__uid` is deprecated.
+        `TwitterWithAutoPagination::Utils#__uid` is deprecated.
       MESSAGE
       uid
     end
 
     def __uid_i
       ActiveSupport::Deprecation.warn(<<-MESSAGE.strip_heredoc)
-        `ExTwitter::Utils#__uid_i` is deprecated.
+        `TwitterWithAutoPagination::Utils#__uid_i` is deprecated.
       MESSAGE
       uid
     end
@@ -26,7 +26,7 @@ module ExTwitter
 
     def __screen_name
       ActiveSupport::Deprecation.warn(<<-MESSAGE.strip_heredoc)
-        `ExTwitter::Utils#__screen_name` is deprecated.
+        `TwitterWithAutoPagination::Utils#__screen_name` is deprecated.
       MESSAGE
       screen_name
     end
@@ -47,7 +47,7 @@ module ExTwitter
     def instrument(operation, key, options = nil)
       payload = {operation: operation, key: key}
       payload.merge!(options) if options.is_a?(Hash)
-      ActiveSupport::Notifications.instrument('call.ex_twitter', payload) { yield(payload) }
+      ActiveSupport::Notifications.instrument('call.twitter_with_auto_pagination', payload) { yield(payload) }
     end
 
     def call_old_method(method_name, *args)
