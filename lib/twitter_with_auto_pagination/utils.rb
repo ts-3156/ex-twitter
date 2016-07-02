@@ -7,14 +7,14 @@ module TwitterWithAutoPagination
 
     def __uid
       ActiveSupport::Deprecation.warn(<<-MESSAGE.strip_heredoc)
-        `TwitterWithAutoPagination::Utils#__uid` is deprecated.
+        `TwitterWithAutoPagination::Utils##{__method__}` is deprecated.
       MESSAGE
       uid
     end
 
     def __uid_i
       ActiveSupport::Deprecation.warn(<<-MESSAGE.strip_heredoc)
-        `TwitterWithAutoPagination::Utils#__uid_i` is deprecated.
+        `TwitterWithAutoPagination::Utils##{__method__}` is deprecated.
       MESSAGE
       uid
     end
@@ -26,7 +26,7 @@ module TwitterWithAutoPagination
 
     def __screen_name
       ActiveSupport::Deprecation.warn(<<-MESSAGE.strip_heredoc)
-        `TwitterWithAutoPagination::Utils#__screen_name` is deprecated.
+        `TwitterWithAutoPagination::Utils##{__method__}` is deprecated.
       MESSAGE
       screen_name
     end

@@ -37,7 +37,7 @@ module TwitterWithAutoPagination
           {method: :user_timeline, args: args}])
     end
 
-    def one_sided_following(me)
+    def one_sided_friends(me)
       if uid_or_screen_name?(me)
         # TODO use friends_and_followers
         friends_parallelly(me).to_a - followers_parallelly(me).to_a
@@ -90,7 +90,7 @@ module TwitterWithAutoPagination
       end
     end
 
-    def removing(pre_me, cur_me)
+    def removed(pre_me, cur_me)
       if uid_or_screen_name?(pre_me) && uid_or_screen_name?(cur_me)
         friends_parallelly(pre_me).to_a - friends_parallelly(cur_me).to_a
       elsif pre_me.respond_to?(:friends) && cur_me.respond_to?(:friends)
@@ -100,7 +100,7 @@ module TwitterWithAutoPagination
       end
     end
 
-    def removed(pre_me, cur_me)
+    def removed_by(pre_me, cur_me)
       if uid_or_screen_name?(pre_me) && uid_or_screen_name?(cur_me)
         followers_parallelly(pre_me).to_a - followers_parallelly(cur_me).to_a
       elsif pre_me.respond_to?(:followers) && cur_me.respond_to?(:followers)
@@ -118,7 +118,7 @@ module TwitterWithAutoPagination
 
     # users which specified user is replying
     # in_reply_to_user_id and in_reply_to_status_id is not used because of distinguishing mentions from replies
-    def replying(*args)
+    def replied(*args)
       options = args.extract_options!
       tweets =
         if args.empty?
@@ -157,7 +157,7 @@ module TwitterWithAutoPagination
 
     # users which specified user is replied
     # when user is login you had better to call mentions_timeline
-    def replied(*args)
+    def replied_by(*args)
       options = args.extract_options!
 
       result =
@@ -192,7 +192,7 @@ module TwitterWithAutoPagination
       end.flatten
     end
 
-    def favoriting(*args)
+    def users_you_faved(*args)
       options = args.extract_options!
 
       favs =
@@ -229,7 +229,7 @@ module TwitterWithAutoPagination
       end
     end
 
-    def favorited_by(*args)
+    def users_fav_you(*args)
     end
 
     def close_friends(*args)
