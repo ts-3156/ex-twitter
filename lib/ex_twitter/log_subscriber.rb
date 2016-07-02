@@ -16,7 +16,7 @@ module ExTwitter
       payload = event.payload
       name  = "#{payload.delete(:name)} (#{event.duration.round(1)}ms)"
       name = colorize_payload_name(name, payload[:name], AS: true)
-      debug { "#{name}: #{(payload.inspect)}" }
+      debug { "#{name} #{(payload.inspect)}" }
     end
 
     %w(read write fetch_hit generate delete exist?).each do |operation|
@@ -38,7 +38,7 @@ module ExTwitter
       # sql  = color(sql, sql_color(sql), true)
 
       key = payload.delete(:key)
-      debug { "#{name}: #{key} #{(payload.inspect)}" }
+      debug { "#{name} #{key} #{(payload.inspect)}" }
     end
 
     private
