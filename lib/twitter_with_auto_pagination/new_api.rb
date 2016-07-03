@@ -96,7 +96,7 @@ module TwitterWithAutoPagination
       end
     end
 
-    def removed(pre_me, cur_me)
+    def users_which_you_removed(pre_me, cur_me)
       if uid_or_screen_name?(pre_me) && uid_or_screen_name?(cur_me)
         friends_parallelly(pre_me).to_a - friends_parallelly(cur_me).to_a
       elsif pre_me.respond_to?(:friends) && cur_me.respond_to?(:friends)
@@ -106,7 +106,7 @@ module TwitterWithAutoPagination
       end
     end
 
-    def removed_by(pre_me, cur_me)
+    def users_who_removed_you(pre_me, cur_me)
       if uid_or_screen_name?(pre_me) && uid_or_screen_name?(cur_me)
         followers_parallelly(pre_me).to_a - followers_parallelly(cur_me).to_a
       elsif pre_me.respond_to?(:followers) && cur_me.respond_to?(:followers)
@@ -124,7 +124,7 @@ module TwitterWithAutoPagination
 
     # users which specified user is replying
     # in_reply_to_user_id and in_reply_to_status_id is not used because of distinguishing mentions from replies
-    def replied(*args)
+    def users_which_you_replied_to(*args)
       options = args.extract_options!
       tweets =
         if args.empty?
@@ -163,7 +163,7 @@ module TwitterWithAutoPagination
 
     # users which specified user is replied
     # when user is login you had better to call mentions_timeline
-    def replied_by(*args)
+    def users_who_replied_to_you(*args)
       options = args.extract_options!
 
       result =
@@ -198,7 +198,7 @@ module TwitterWithAutoPagination
       end.flatten
     end
 
-    def users_you_faved(*args)
+    def users_which_you_faved(*args)
       options = args.extract_options!
 
       favs =
@@ -223,6 +223,9 @@ module TwitterWithAutoPagination
       raise e
     end
 
+    def users_who_faved_you(*args)
+    end
+
     def _extract_inactive_users(users, options = {})
       authorized = options.delete(:authorized)
       two_weeks_ago = 2.weeks.ago.to_i
@@ -233,9 +236,6 @@ module TwitterWithAutoPagination
           false
         end
       end
-    end
-
-    def users_fav_you(*args)
     end
 
     def close_friends(*args)

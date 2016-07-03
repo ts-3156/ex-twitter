@@ -135,17 +135,25 @@ client.close_friends
 ```
 
 ```
-client.removed(pre_me, cur_me)
+client.users_which_you_removed(pre_me, cur_me)
 ```
 
 ```
-client.removed_by(pre_me, cur_me)
+client.users_who_removed_you(pre_me, cur_me)
 ```
 
 ```
-client.replied
+client.users_which_you_replied_to
 ```
 
 ```
-client.replied_by
+client.users_who_replied_to_you
+```
+
+```
+client.users_which_you_faved
+```
+
+```
+client.users_who_faved_you
 ```
