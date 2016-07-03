@@ -245,31 +245,31 @@ module TwitterWithAutoPagination
         max: options.has_key?(:max) ? options.delete(:max) : 1000
       }
 
-      _replying, _replied, _favoriting =
+      _users_which_you_replied_to, _users_who_replied_to_you, _users_which_you_faved =
         if args.empty?
-          [replying(options), replied(options), favoriting(options)]
+          [users_which_you_replied_to(options), users_who_replied_to_you(options), users_which_you_faved(options)]
         elsif uid_or_screen_name?(args[0])
-          [replying(args[0], options), replied(args[0], options), favoriting(args[0], options)]
-        elsif (m_names = %i(replying replied favoriting)).all? { |m_name| args[0].respond_to?(m_name) }
+          [users_which_you_replied_to(args[0], options), users_who_replied_to_you(args[0], options), users_which_you_faved(args[0], options)]
+        elsif (m_names = %i(users_which_you_replied_to users_who_replied_to_you users_which_you_faved)).all? { |m_name| args[0].respond_to?(m_name) }
           m_names.map { |mn| args[0].send(mn) }
         else
           raise
         end
 
-      _users = _replying + _replied + _favoriting
+      _users = _users_which_you_replied_to + _users_who_replied_to_you + _users_which_you_faved
       return [] if _users.empty?
 
       scores = _count_users_with_two_sided_threshold(_users, min_max)
-      replying_scores = _count_users_with_two_sided_threshold(_replying, min_max)
-      replied_scores = _count_users_with_two_sided_threshold(_replied, min_max)
-      favoriting_scores = _count_users_with_two_sided_threshold(_favoriting, min_max)
+      users_which_you_replied_to_scores = _count_users_with_two_sided_threshold(_users_which_you_replied_to, min_max)
+      users_who_replied_to_you_scores = _count_users_with_two_sided_threshold(_users_who_replied_to_you, min_max)
+      users_which_you_faved_scores = _count_users_with_two_sided_threshold(_users_which_you_faved, min_max)
 
       scores.keys.map { |uid| _users.find { |u| u.id.to_i == uid.to_i } }.
         map do |u|
         u[:score] = scores[u.id]
-        u[:replying_score] = replying_scores[u.id]
-        u[:replied_score] = replied_scores[u.id]
-        u[:favoriting_score] = favoriting_scores[u.id]
+        u[:users_which_you_replied_to_score] = users_which_you_replied_to_scores[u.id]
+        u[:users_who_replied_to_you_score] = users_who_replied_to_you_scores[u.id]
+        u[:users_which_you_faved_score] = users_which_you_faved_scores[u.id]
         u
       end
     end
