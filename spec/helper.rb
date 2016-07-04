@@ -13,36 +13,38 @@ RSpec.configure do |config|
   end
 end
 
+BASE_URL = 'https://api.twitter.com'.freeze
+
 def a_delete(path)
-  a_request(:delete, Twitter::REST::Request::BASE_URL + path)
+  a_request(:delete, BASE_URL + path)
 end
 
 def a_get(path)
-  a_request(:get, Twitter::REST::Request::BASE_URL + path)
+  a_request(:get, BASE_URL + path)
 end
 
 def a_post(path)
-  a_request(:post, Twitter::REST::Request::BASE_URL + path)
+  a_request(:post, BASE_URL + path)
 end
 
 def a_put(path)
-  a_request(:put, Twitter::REST::Request::BASE_URL + path)
+  a_request(:put, BASE_URL + path)
 end
 
 def stub_delete(path)
-  stub_request(:delete, Twitter::REST::Request::BASE_URL + path)
+  stub_request(:delete, BASE_URL + path)
 end
 
 def stub_get(path)
-  stub_request(:get, Twitter::REST::Request::BASE_URL + path)
+  stub_request(:get, BASE_URL + path)
 end
 
 def stub_post(path)
-  stub_request(:post, Twitter::REST::Request::BASE_URL + path)
+  stub_request(:post, BASE_URL + path)
 end
 
 def stub_put(path)
-  stub_request(:put, Twitter::REST::Request::BASE_URL + path)
+  stub_request(:put, BASE_URL + path)
 end
 
 def fixture_path
