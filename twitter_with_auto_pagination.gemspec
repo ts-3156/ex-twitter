@@ -19,6 +19,7 @@ Gem::Specification.new do |spec|
   spec.licenses = %w[MIT]
   spec.name = 'twitter_with_auto_pagination'
   spec.require_paths = %w[lib]
+  spec.required_ruby_version = '>= 2.3'
   spec.summary = spec.description
   spec.test_files = Dir.glob('spec/**/*')
   spec.version = '0.6.1'
