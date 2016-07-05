@@ -9,7 +9,7 @@ module TwitterWithAutoPagination
       def verify_credentials(*args)
         options = {skip_status: true}.merge(args.extract_options!)
         fetch_cache_or_call_api(__method__, args) {
-          call_api(__method__, args[0], options) { super(*args, options) }
+          call_api(method(__method__).super_method, *args, options)
         }
       end
 
@@ -17,7 +17,7 @@ module TwitterWithAutoPagination
         options = args.extract_options!
         args[0] = verify_credentials.id if args.empty?
         fetch_cache_or_call_api(__method__, args[0], options) {
-          call_api(__method__, args[0], options) { super(args[0], options) }
+          call_api(method(__method__).super_method, *args, options)
         }
       end
 
@@ -25,7 +25,7 @@ module TwitterWithAutoPagination
         options = args.extract_options!
         args[0] = verify_credentials.id if args.empty?
         fetch_cache_or_call_api(__method__, args[0], options) {
-          call_api(__method__, args[0], options) { super(args[0], options) }
+          call_api(method(__method__).super_method, *args, options)
         }
       end
 
@@ -40,7 +40,7 @@ module TwitterWithAutoPagination
 
         Parallel.each_with_index(users_per_workers, in_threads: [users_per_workers.size, 10].min) do |users_per_worker, i|
           _users = fetch_cache_or_call_api(__method__, users_per_worker, options) {
-            call_api(__method__, users_per_worker, options) { super(users_per_worker, options) }
+            call_api(method(__method__).super_method, users_per_worker, options)
           }
 
           processed_users << {i: i, users: _users}

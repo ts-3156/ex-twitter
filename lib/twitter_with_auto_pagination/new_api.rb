@@ -1,11 +1,13 @@
 module TwitterWithAutoPagination
   module NewApi
+    # OK
     def friends_parallelly(*args)
       options = {super_operation: __method__}.merge(args.extract_options!)
       _friend_ids = friend_ids(*(args + [options]))
       users(_friend_ids.map { |id| id.to_i }, options)
     end
 
+    # OK
     def followers_parallelly(*args)
       options = {super_operation: __method__}.merge(args.extract_options!)
       _follower_ids = follower_ids(*(args + [options]))

@@ -53,45 +53,46 @@ module TwitterWithAutoPagination
         ActiveSupport::Notifications.instrument('call.twitter_with_auto_pagination', payload) { yield(payload) }
       end
 
-      def call_api(method_name, *args)
-        options = args.extract_options!
+      def call_api(method_obj, *args)
+        api_options = args.extract_options!
         begin
           self.call_count += 1
-          _options = {method_name: method_name, call_count: self.call_count, args: args}.merge(options)
-          instrument('api call', args[0], _options) { yield }
+          # TODO call without reduce, call_count
+          options = {method_name: method_obj.name, call_count: self.call_count, args: [*args, api_options]}
+          instrument('api call', args[0], options) { method_obj.call(*args, api_options) }
         rescue Twitter::Error::TooManyRequests => e
-          logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} Retry after #{e.rate_limit.reset_in} seconds."
+          logger.warn "#{__method__}: call=#{method_obj} #{args.inspect} #{e.class} Retry after #{e.rate_limit.reset_in} seconds."
           raise e
         rescue Twitter::Error::ServiceUnavailable => e
-          logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} #{e.message}"
+          logger.warn "#{__method__}: call=#{method_obj} #{args.inspect} #{e.class} #{e.message}"
           raise e
         rescue Twitter::Error::InternalServerError => e
-          logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} #{e.message}"
+          logger.warn "#{__method__}: call=#{method_obj} #{args.inspect} #{e.class} #{e.message}"
           raise e
         rescue Twitter::Error::Forbidden => e
-          logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} #{e.message}"
+          logger.warn "#{__method__}: call=#{method_obj} #{args.inspect} #{e.class} #{e.message}"
           raise e
         rescue Twitter::Error::NotFound => e
-          logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} #{e.message}"
+          logger.warn "#{__method__}: call=#{method_obj} #{args.inspect} #{e.class} #{e.message}"
           raise e
         rescue => e
-          logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} #{e.message}"
+          logger.warn "#{__method__}: call=#{method_obj} #{args.inspect} #{e.class} #{e.message}"
           raise e
         end
       end
 
       # user_timeline, search
-      def collect_with_max_id(method_name, *args)
+      def collect_with_max_id(method_obj, *args)
         options = args.extract_options!
         call_limit = options.delete(:call_limit) || 3
-        last_response = call_old_method(method_name, *args, options)
+        last_response = call_api(method_obj, *args, options)
         last_response = yield(last_response) if block_given?
         return_data = last_response
         call_count = 1
 
         while last_response.any? && call_count < call_limit
           options[:max_id] = last_response.last.kind_of?(Hash) ? last_response.last[:id] : last_response.last.id
-          last_response = call_old_method(method_name, *args, options)
+          last_response = call_api(method_obj, *args, options)
           last_response = yield(last_response) if block_given?
           return_data += last_response
           call_count += 1
@@ -101,14 +102,14 @@ module TwitterWithAutoPagination
       end
 
       # friends, followers
-      def collect_with_cursor(method_name, *args)
+      def collect_with_cursor(method_obj, *args)
         options = args.extract_options!
-        last_response = call_old_method(method_name, *args, options).attrs
+        last_response = call_api(method_obj, *args, options).attrs
         return_data = (last_response[:users] || last_response[:ids])
 
         while (next_cursor = last_response[:next_cursor]) && next_cursor != 0
           options[:cursor] = next_cursor
-          last_response = call_old_method(method_name, *args, options).attrs
+          last_response = call_api(method_obj, *args, options).attrs
           return_data += (last_response[:users] || last_response[:ids])
         end
 
