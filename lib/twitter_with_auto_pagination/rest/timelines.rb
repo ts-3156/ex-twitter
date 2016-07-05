@@ -14,7 +14,7 @@ module TwitterWithAutoPagination
 
       def user_timeline(*args)
         options = {count: 200, include_rts: true, call_limit: 3}.merge(args.extract_options!)
-        args[0] = verify_credentials(skip_status: true).id if args.empty?
+        args[0] = verify_credentials.id if args.empty?
         fetch_cache_or_call_api(__method__, args[0], options) {
           collect_with_max_id("old_#{__method__}", *args, options)
         }
