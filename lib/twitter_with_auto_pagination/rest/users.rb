@@ -1,4 +1,5 @@
 require 'twitter_with_auto_pagination/rest/utils'
+require 'parallel'
 
 module TwitterWithAutoPagination
   module REST
@@ -8,25 +9,23 @@ module TwitterWithAutoPagination
       def verify_credentials(*args)
         options = {skip_status: true}.merge(args.extract_options!)
         fetch_cache_or_call_api(__method__, args) {
-          call_old_method("old_#{__method__}", *args, options)
+          call_api(__method__, args[0], options) { super(*args, options) }
         }
       end
 
       def user?(*args)
         options = args.extract_options!
-
-        args[0] = verify_credentials(skip_status: true).id if args.empty?
+        args[0] = verify_credentials.id if args.empty?
         fetch_cache_or_call_api(__method__, args[0], options) {
           call_api(__method__, args[0], options) { super(args[0], options) }
-          # call_old_method("old_#{__method__}", args[0], options)
         }
       end
 
       def user(*args)
         options = args.extract_options!
-        args[0] = verify_credentials(skip_status: true).id if args.empty?
+        args[0] = verify_credentials.id if args.empty?
         fetch_cache_or_call_api(__method__, args[0], options) {
-          call_old_method("old_#{__method__}", args[0], options)
+          call_api(__method__, args[0], options) { super(args[0], options) }
         }
       end
 
@@ -41,7 +40,7 @@ module TwitterWithAutoPagination
 
         Parallel.each_with_index(users_per_workers, in_threads: [users_per_workers.size, 10].min) do |users_per_worker, i|
           _users = fetch_cache_or_call_api(__method__, users_per_worker, options) {
-            call_old_method("old_#{__method__}", users_per_worker, options)
+            call_api(__method__, users_per_worker, options) { super(users_per_worker, options) }
           }
 
           processed_users << {i: i, users: _users}

@@ -1,3 +1,5 @@
+require 'hashie'
+
 module TwitterWithAutoPagination
   module REST
     module Utils
@@ -57,33 +59,6 @@ module TwitterWithAutoPagination
           self.call_count += 1
           _options = {method_name: method_name, call_count: self.call_count, args: args}.merge(options)
           instrument('api call', args[0], _options) { yield }
-        rescue Twitter::Error::TooManyRequests => e
-          logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} Retry after #{e.rate_limit.reset_in} seconds."
-          raise e
-        rescue Twitter::Error::ServiceUnavailable => e
-          logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} #{e.message}"
-          raise e
-        rescue Twitter::Error::InternalServerError => e
-          logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} #{e.message}"
-          raise e
-        rescue Twitter::Error::Forbidden => e
-          logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} #{e.message}"
-          raise e
-        rescue Twitter::Error::NotFound => e
-          logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} #{e.message}"
-          raise e
-        rescue => e
-          logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} #{e.message}"
-          raise e
-        end
-      end
-
-      def call_old_method(method_name, *args)
-        options = args.extract_options!
-        begin
-          self.call_count += 1
-          _options = {method_name: method_name, call_count: self.call_count, args: args}.merge(options)
-          instrument('api call', args[0], _options) { send(method_name, *args, options) }
         rescue Twitter::Error::TooManyRequests => e
           logger.warn "#{__method__}: call=#{method_name} #{args.inspect} #{e.class} Retry after #{e.rate_limit.reset_in} seconds."
           raise e
