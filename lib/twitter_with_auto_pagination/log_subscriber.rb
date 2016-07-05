@@ -73,7 +73,7 @@ module TwitterWithAutoPagination
     end
 
     def logger
-      TwitterWithAutoPagination::Client.logger
+      Twitter::REST::Client.logger
     end
   end
 end
