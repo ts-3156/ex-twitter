@@ -41,7 +41,7 @@ module TwitterWithAutoPagination
           elsif obj.respond_to?(:friends) && obj.respond_to?(:followers)
             [obj.friends, obj.followers]
           else
-            raise ArgumentError
+            raise ArgumentError, args.inspect
           end
         end
 
@@ -67,12 +67,14 @@ module TwitterWithAutoPagination
         end
 
         def _retrieve_friends(*args)
-          if args.all? { |obj| uid_or_screen_name?(obj) }
+          if args.size == 1
+            args[0].nil? ? friends : friends(args[0])
+          elsif args.all? { |obj| uid_or_screen_name?(obj) }
             _fetch_parallelly(args.map { |obj| {method: :friends, args: [obj]} })
           elsif args.all? { |obj| obj.respond_to?(:friends) }
             args.map { |obj| obj.friends }
           else
-            raise ArgumentError
+            raise ArgumentError, args.inspect
           end
         end
 
@@ -84,12 +86,14 @@ module TwitterWithAutoPagination
         end
 
         def _retrieve_followers(*args)
-          if args.all? { |obj| uid_or_screen_name?(obj) }
+          if args.size == 1
+            args[0].nil? ? followers : followers(args[0])
+          elsif args.all? { |obj| uid_or_screen_name?(obj) }
             _fetch_parallelly(args.map { |obj| {method: :followers, args: [obj]} })
           elsif args.all? { |obj| obj.respond_to?(:followers) }
             args.map { |obj| obj.followers }
           else
-            raise ArgumentError
+            raise ArgumentError, args.inspect
           end
         end
 

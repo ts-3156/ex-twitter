@@ -63,9 +63,9 @@ module TwitterWithAutoPagination
           names = %i(replying replied favoriting)
           options = args.extract_options!
           if args.empty?
-            names.map { |n| send(n, options) }
+            _fetch_parallelly(names.map { |n| {method: n, args: [options]} })
           elsif uid_or_screen_name?(args[0])
-            names.map { |n| send(n, args[0], options) }
+            _fetch_parallelly(names.map { |n| {method: n, args: [args[0], options]} })
           elsif names.all? { |n| args[0].respond_to?(n) }
             names.map { |n| args[0].send(n) }
           else
