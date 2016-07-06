@@ -1,4 +1,5 @@
 require 'hashie'
+require 'digest/md5'
 
 module TwitterWithAutoPagination
   module REST
@@ -45,6 +46,11 @@ module TwitterWithAutoPagination
       def authorized_user?(target)
         target_user = user(target)
         !target_user.protected? || friendship?(user.id.to_i, target_user.id.to_i)
+      end
+
+      def credentials_hash
+        str = access_token + access_token_secret + consumer_key + consumer_secret
+        Digest::MD5.hexdigest(str)
       end
 
       def instrument(operation, key, options = nil)
@@ -108,14 +114,12 @@ module TwitterWithAutoPagination
         return_data
       end
 
-      require 'digest/md5'
-
       def file_cache_key(method_name, user, options = {})
         delim = ':'
         identifier =
           case
             when method_name == :verify_credentials
-              "object-id#{delim}#{object_id}"
+              "hash-str#{delim}#{credentials_hash}"
             when method_name == :search
               "str#{delim}#{user.to_s}"
             when method_name == :mentions_timeline

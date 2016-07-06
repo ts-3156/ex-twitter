@@ -7,25 +7,31 @@ module TwitterWithAutoPagination
 
       def friendship?(*args)
         options = args.extract_options!
-        fetch_cache_or_call_api(__method__, args) {
-          call_api(method(__method__).super_method, *args, options)
-        }
+        instrument(__method__, nil, options) do
+          fetch_cache_or_call_api(__method__, args) do
+            call_api(method(__method__).super_method, *args, options)
+          end
+        end
       end
 
       def friend_ids(*args)
         options = {count: 5000, cursor: -1}.merge(args.extract_options!)
         args[0] = verify_credentials.id if args.empty?
-        fetch_cache_or_call_api(__method__, args[0], options) {
-          collect_with_cursor(method(__method__).super_method, *args, options)
-        }
+        instrument(__method__, nil, options) do
+          fetch_cache_or_call_api(__method__, args[0], options) do
+            collect_with_cursor(method(__method__).super_method, *args, options)
+          end
+        end
       end
 
       def follower_ids(*args)
         options = {count: 5000, cursor: -1}.merge(args.extract_options!)
         args[0] = verify_credentials.id if args.empty?
-        fetch_cache_or_call_api(__method__, args[0], options) {
-          collect_with_cursor(method(__method__).super_method, *args, options)
-        }
+        instrument(__method__, nil, options) do
+          fetch_cache_or_call_api(__method__, args[0], options) do
+            collect_with_cursor(method(__method__).super_method, *args, options)
+          end
+        end
       end
 
       # specify reduce: false to use tweet for inactive_*
@@ -42,14 +48,18 @@ module TwitterWithAutoPagination
         options = {count: 200, include_user_entities: true, cursor: -1}.merge(args.extract_options!)
         options[:reduce] = false unless options.has_key?(:reduce)
         args[0] = verify_credentials.id if args.empty?
-        fetch_cache_or_call_api(:friends, args[0], options) {
-          collect_with_cursor(method(:friends).super_method, *args, options)
-        }
+        instrument(__method__, nil, options) do
+          fetch_cache_or_call_api(:friends, args[0], options) do
+            collect_with_cursor(method(:friends).super_method, *args, options)
+          end
+        end
       end
 
       def _friends_parallelly(*args)
         options = {super_operation: __method__}.merge(args.extract_options!)
-        users(friend_ids(*args, options).map { |id| id.to_i }, options)
+        instrument(__method__, nil, options) do
+          users(friend_ids(*args, options).map { |id| id.to_i }, options)
+        end
       end
 
       # specify reduce: false to use tweet for inactive_*
@@ -66,14 +76,18 @@ module TwitterWithAutoPagination
         options = {count: 200, include_user_entities: true, cursor: -1}.merge(args.extract_options!)
         options[:reduce] = false unless options.has_key?(:reduce)
         args[0] = verify_credentials.id if args.empty?
-        fetch_cache_or_call_api(:followers, args[0], options) {
-          collect_with_cursor(method(:followers).super_method, *args, options)
-        }
+        instrument(__method__, nil, options) do
+          fetch_cache_or_call_api(:followers, args[0], options) do
+            collect_with_cursor(method(:followers).super_method, *args, options)
+          end
+        end
       end
 
       def _followers_parallelly(*args)
         options = {super_operation: __method__}.merge(args.extract_options!)
-        users(follower_ids(*args, options).map { |id| id.to_i }, options)
+        instrument(__method__, nil, options) do
+          users(follower_ids(*args, options).map { |id| id.to_i }, options)
+        end
       end
     end
   end
