@@ -26,7 +26,7 @@ Add `twitter_with_auto_pagination` to your Gemfile, and bundle.
 
 ## Configuration
 
-You can pass configuration options as a block to Twitter::REST::Client.new just like Twitter gem.
+You can pass configuration options as a block to `Twitter::REST::Client.new` just like Twitter gem.
 
 ```
 client = Twitter::REST::Client.new do |config|
