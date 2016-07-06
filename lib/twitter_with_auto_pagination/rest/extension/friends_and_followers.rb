@@ -66,33 +66,58 @@ module TwitterWithAutoPagination
           end
         end
 
+        def _retrieve_friends(*args)
+          if args.all? { |obj| uid_or_screen_name?(obj) }
+            _fetch_parallelly(args.map { |obj| {method: :friends, args: [obj]} })
+          elsif args.all? { |obj| obj.respond_to?(:friends) }
+            args.map { |obj| obj.friends }
+          else
+            raise ArgumentError
+          end
+        end
+
         def common_friends(me, you)
           instrument(__method__, nil) do
-            my_friends, your_friends =
-              if uid_or_screen_name?(me) && uid_or_screen_name?(you)
-                _fetch_parallelly([{method: :friends, args: [me]}, {method: :friends, args: [you]}])
-              elsif me.respond_to?(:friends) && you.respond_to?(:friends)
-                [me.friends, you.friends]
-              else
-                raise ArgumentError
-              end
-
+            my_friends, your_friends = _retrieve_friends(me, you)
             my_friends.to_a & your_friends.to_a
+          end
+        end
+
+        def _retrieve_followers(*args)
+          if args.all? { |obj| uid_or_screen_name?(obj) }
+            _fetch_parallelly(args.map { |obj| {method: :followers, args: [obj]} })
+          elsif args.all? { |obj| obj.respond_to?(:followers) }
+            args.map { |obj| obj.followers }
+          else
+            raise ArgumentError
           end
         end
 
         def common_followers(me, you)
           instrument(__method__, nil) do
-            my_followers, your_followers =
-              if uid_or_screen_name?(me) && uid_or_screen_name?(you)
-                _fetch_parallelly([{method: :followers, args: [me]}, {method: :followers, args: [you]}])
-              elsif me.respond_to?(:followers) && you.respond_to?(:followers)
-                [me.followers, you.followers]
-              else
-                raise ArgumentError
-              end
-
+            my_followers, your_followers = _retrieve_followers(me, you)
             my_followers.to_a & your_followers.to_a
+          end
+        end
+
+        def _extract_inactive_users(users)
+          two_weeks_ago = 2.weeks.ago.to_i
+          users.select do |u|
+            (Time.parse(u.status.created_at).to_i < two_weeks_ago) rescue false
+          end
+        end
+
+        def inactive_friends(user = nil)
+          instrument(__method__, nil) do
+            _friends = _retrieve_friends(user)
+            _extract_inactive_users(_friends)
+          end
+        end
+
+        def inactive_followers(user = nil)
+          instrument(__method__, nil) do
+            _followers = _retrieve_followers(user)
+            _extract_inactive_users(_followers)
           end
         end
       end
