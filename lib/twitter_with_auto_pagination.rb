@@ -36,8 +36,8 @@ module Twitter
         @@logger
       end
 
-      attr_accessor :call_count
-      attr_reader :cache, :authenticated_user, :logger
+      attr_accessor :call_count, :logger
+      attr_reader :cache
 
       INDENT = 4
     end

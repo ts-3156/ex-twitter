@@ -1,8 +1,8 @@
 twitter-with-auto-pagination
 ============================
 
-[![Gem Version](https://badge.fury.io/rb/ex_twitter.png)](https://badge.fury.io/rb/twitter_with_auto_pagination)
-[![Build Status](https://travis-ci.org/ts-3156/ex-twitter.svg?branch=master)](https://travis-ci.org/ts-3156/twitter-with-auto-pagination)
+[![Gem Version](https://badge.fury.io/rb/twitter_with_auto_pagination.png)](https://badge.fury.io/rb/twitter_with_auto_pagination)
+[![Build Status](https://travis-ci.org/ts-3156/twitter-with-auto-pagination.svg?branch=master)](https://travis-ci.org/ts-3156/twitter-with-auto-pagination)
 
 Add auto pagination, auto caching and parallelly fetching features to Twitter gem.
 
@@ -26,16 +26,14 @@ Add `twitter_with_auto_pagination` to your Gemfile, and bundle.
 
 ## Configuration
 
-You can pass configuration options as a block to `TwitterWithAutoPagination::Client.new` just like `Twitter::REST::Client.new`.
+You can pass configuration options as a block to Twitter::REST::Client.new just like Twitter gem.
 
 ```
-client = TwitterWithAutoPagination::Client.new do |config|
+client = Twitter::REST::Client.new do |config|
   config.consumer_key        = "YOUR_CONSUMER_KEY"
   config.consumer_secret     = "YOUR_CONSUMER_SECRET"
   config.access_token        = "YOUR_ACCESS_TOKEN"
   config.access_token_secret = "YOUR_ACCESS_SECRET"
-  config.log_level           = :debug             # optional
-  config.logger              = Logger.new(STDOUT) # optional
 end
 ```
 
@@ -135,25 +133,17 @@ client.close_friends
 ```
 
 ```
-client.users_which_you_removed(pre_me, cur_me)
+client.removing(past_me, cur_me)
 ```
 
 ```
-client.users_who_removed_you(pre_me, cur_me)
+client.removed(past_me, cur_me)
 ```
 
 ```
-client.users_which_you_replied_to
+client.replying
 ```
 
 ```
-client.users_who_replied_to_you
-```
-
-```
-client.users_which_you_faved
-```
-
-```
-client.users_who_faved_you
+client.replied
 ```
