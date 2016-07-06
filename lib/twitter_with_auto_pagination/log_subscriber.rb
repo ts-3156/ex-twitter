@@ -38,7 +38,7 @@ module TwitterWithAutoPagination
       # sql  = color(sql, sql_color(sql), true)
 
       key = payload.delete(:key)
-      debug { "#{name} #{key} #{(payload.inspect)}" }
+      debug { "#{name}#{key.nil? ? '' : " #{key}"} #{(payload.inspect)}" }
     end
 
     private
@@ -73,7 +73,7 @@ module TwitterWithAutoPagination
     end
 
     def logger
-      TwitterWithAutoPagination::Client.logger
+      Twitter::REST::Client.logger
     end
   end
 end
