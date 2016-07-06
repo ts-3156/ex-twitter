@@ -8,25 +8,31 @@ module TwitterWithAutoPagination
 
       def verify_credentials(*args)
         options = {skip_status: true}.merge(args.extract_options!)
-        fetch_cache_or_call_api(__method__, args) {
-          call_api(method(__method__).super_method, *args, options)
-        }
+        instrument(__method__, nil, options) do
+          fetch_cache_or_call_api(__method__, args) do
+            call_api(method(__method__).super_method, *args, options)
+          end
+        end
       end
 
       def user?(*args)
         options = args.extract_options!
         args[0] = verify_credentials.id if args.empty?
-        fetch_cache_or_call_api(__method__, args[0], options) {
-          call_api(method(__method__).super_method, *args, options)
-        }
+        instrument(__method__, nil, options) do
+          fetch_cache_or_call_api(__method__, args[0], options) do
+            call_api(method(__method__).super_method, *args, options)
+          end
+        end
       end
 
       def user(*args)
         options = args.extract_options!
         args[0] = verify_credentials.id if args.empty?
-        fetch_cache_or_call_api(__method__, args[0], options) {
-          call_api(method(__method__).super_method, *args, options)
-        }
+        instrument(__method__, nil, options) do
+          fetch_cache_or_call_api(__method__, args[0], options) do
+            call_api(method(__method__).super_method, *args, options)
+          end
+        end
       end
 
       # use compact, not use sort and uniq
@@ -37,16 +43,19 @@ module TwitterWithAutoPagination
         options[:reduce] = false
         users_per_workers = args.first.compact.each_slice(100).to_a
         processed_users = []
+        thread_size = [users_per_workers.size, 10].min
 
-        Parallel.each_with_index(users_per_workers, in_threads: [users_per_workers.size, 10].min) do |users_per_worker, i|
-          _users = fetch_cache_or_call_api(__method__, users_per_worker, options) {
-            call_api(method(__method__).super_method, users_per_worker, options)
-          }
+        instrument(__method__, nil, options) do
+          Parallel.each_with_index(users_per_workers, in_threads: thread_size) do |users_per_worker, i|
+            _users = fetch_cache_or_call_api(__method__, users_per_worker, options) do
+              call_api(method(__method__).super_method, users_per_worker, options)
+            end
 
-          processed_users << {i: i, users: _users}
+            processed_users << {i: i, users: _users}
+          end
         end
 
-        processed_users.sort_by{|p| p[:i] }.map{|p| p[:users] }.flatten.compact
+        processed_users.sort_by { |p| p[:i] }.map { |p| p[:users] }.flatten.compact
       end
     end
   end

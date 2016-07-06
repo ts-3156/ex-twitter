@@ -59,24 +59,16 @@ module TwitterWithAutoPagination
           self.call_count += 1
           # TODO call without reduce, call_count
           options = {method_name: method_obj.name, call_count: self.call_count, args: [*args, api_options]}
-          instrument('api call', args[0], options) { method_obj.call(*args, api_options) }
+          instrument('request', args[0], options) { method_obj.call(*args, api_options) }
         rescue Twitter::Error::TooManyRequests => e
-          logger.warn "#{__method__}: call=#{method_obj} #{args.inspect} #{e.class} Retry after #{e.rate_limit.reset_in} seconds."
+          logger.warn "#{__method__}: #{options.inspect} #{e.class} Retry after #{e.rate_limit.reset_in} seconds."
           raise e
-        rescue Twitter::Error::ServiceUnavailable => e
-          logger.warn "#{__method__}: call=#{method_obj} #{args.inspect} #{e.class} #{e.message}"
-          raise e
-        rescue Twitter::Error::InternalServerError => e
-          logger.warn "#{__method__}: call=#{method_obj} #{args.inspect} #{e.class} #{e.message}"
-          raise e
-        rescue Twitter::Error::Forbidden => e
-          logger.warn "#{__method__}: call=#{method_obj} #{args.inspect} #{e.class} #{e.message}"
-          raise e
-        rescue Twitter::Error::NotFound => e
-          logger.warn "#{__method__}: call=#{method_obj} #{args.inspect} #{e.class} #{e.message}"
+        rescue Twitter::Error::ServiceUnavailable, Twitter::Error::InternalServerError,
+          Twitter::Error::Forbidden, Twitter::Error::NotFound => e
+          logger.warn "#{__method__}: #{options.inspect} #{e.class} #{e.message}"
           raise e
         rescue => e
-          logger.warn "#{__method__}: call=#{method_obj} #{args.inspect} #{e.class} #{e.message}"
+          logger.warn "NEED TO CATCH! #{__method__}: #{options.inspect} #{e.class} #{e.message}"
           raise e
         end
       end
@@ -291,17 +283,17 @@ module TwitterWithAutoPagination
         key = namespaced_key(method_name, user, options)
         # options.update(key: key)
 
-        data =
+        fetch_result =
           if options[:cache] == :read
             instrument('Cache Read(Force)', key, caller: method_name) { cache.read(key) }
           else
             cache.fetch(key, expires_in: 1.hour, race_condition_ttl: 5.minutes) do
-              _d = yield
-              instrument('serialize', key, caller: method_name) { encode_json(_d, method_name, options) }
+              block_result = yield
+              instrument('serialize', key, caller: method_name) { encode_json(block_result, method_name, options) }
             end
           end
 
-        instrument('deserialize', key, caller: method_name) { decode_json(data, method_name, options) }
+        instrument('deserialize', key, caller: method_name) { decode_json(fetch_result, method_name, options) }
       end
     end
   end
