@@ -13,6 +13,7 @@ module TwitterWithAutoPagination
           end
         end
 
+        alias removing users_which_you_removed
         alias unfollowing users_which_you_removed
 
         def users_who_removed_you(past_me, cur_me)
@@ -22,6 +23,7 @@ module TwitterWithAutoPagination
           end
         end
 
+        alias removed users_who_removed_you
         alias unfollowed users_who_removed_you
       end
     end
