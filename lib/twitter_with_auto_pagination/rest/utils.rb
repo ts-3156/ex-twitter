@@ -285,7 +285,6 @@ module TwitterWithAutoPagination
 
       def fetch_cache_or_call_api(method_name, user, options = {})
         key = namespaced_key(method_name, user, options)
-        # options.update(key: key)
 
         fetch_result =
           if options[:cache] == :read
