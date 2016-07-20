@@ -46,11 +46,10 @@ module TwitterWithAutoPagination
 
       def _friends_serially(*args)
         options = {count: 200, include_user_entities: true, cursor: -1}.merge(args.extract_options!)
-        options[:reduce] = false unless options.has_key?(:reduce)
         args[0] = verify_credentials.id if args.empty?
         instrument(__method__, nil, options) do
           fetch_cache_or_call_api(:friends, args[0], options) do
-            collect_with_cursor(method(:friends).super_method, *args, options)
+            collect_with_cursor(method(:friends).super_method, *args, options).map { |u| u.to_hash }
           end
         end
       end
@@ -74,11 +73,10 @@ module TwitterWithAutoPagination
 
       def _followers_serially(*args)
         options = {count: 200, include_user_entities: true, cursor: -1}.merge(args.extract_options!)
-        options[:reduce] = false unless options.has_key?(:reduce)
         args[0] = verify_credentials.id if args.empty?
         instrument(__method__, nil, options) do
           fetch_cache_or_call_api(:followers, args[0], options) do
-            collect_with_cursor(method(:followers).super_method, *args, options)
+            collect_with_cursor(method(:followers).super_method, *args, options).map { |u| u.to_hash }
           end
         end
       end

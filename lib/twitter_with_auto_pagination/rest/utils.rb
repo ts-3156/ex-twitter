@@ -132,7 +132,8 @@ module TwitterWithAutoPagination
                   "#{options[:super_operation]}-ids#{delim}#{Digest::MD5.hexdigest(user.join(','))}"
                 when user.kind_of?(Array) && user.first.kind_of?(String)
                   "#{options[:super_operation]}-sns#{delim}#{Digest::MD5.hexdigest(user.join(','))}"
-                else raise "#{method_name.inspect} #{user.inspect}"
+                else
+                  raise "#{method_name.inspect} #{user.inspect}"
               end
             when user.kind_of?(Integer)
               "id#{delim}#{user.to_s}"
@@ -144,7 +145,8 @@ module TwitterWithAutoPagination
               "sn#{delim}#{user}"
             when user.kind_of?(Twitter::User)
               "user#{delim}#{user.id.to_s}"
-            else raise "#{method_name.inspect} #{user.inspect}"
+            else
+              raise "#{method_name.inspect} #{user.inspect}"
           end
 
         "#{method_name}#{delim}#{identifier}"
@@ -154,132 +156,25 @@ module TwitterWithAutoPagination
         file_cache_key(method_name, user, options)
       end
 
-      PROFILE_SAVE_KEYS = %i(
-          id
-          name
-          screen_name
-          location
-          description
-          url
-          protected
-          followers_count
-          friends_count
-          listed_count
-          favourites_count
-          utc_offset
-          time_zone
-          geo_enabled
-          verified
-          statuses_count
-          lang
-          status
-          profile_image_url_https
-          profile_banner_url
-          profile_link_color
-          suspended
-          verified
-          entities
-          created_at
-        )
+      CODER = JSON
 
-      STATUS_SAVE_KEYS = %i(
-        created_at
-        id
-        text
-        source
-        truncated
-        coordinates
-        place
-        entities
-        user
-        contributors
-        is_quote_status
-        retweet_count
-        favorite_count
-        favorited
-        retweeted
-        possibly_sensitive
-        lang
-      )
-
-      # encode
-      def encode_json(obj, caller_name, options = {})
-        options[:reduce] = true unless options.has_key?(:reduce)
-        case caller_name
-          when :user_timeline, :home_timeline, :mentions_timeline, :favorites # Twitter::Tweet
-            JSON.pretty_generate(obj.map { |o| o.attrs })
-
-          when :search # Hash
-            data =
-              if options[:reduce]
-                obj.map { |o| o.to_hash.slice(*STATUS_SAVE_KEYS) }
-              else
-                obj.map { |o| o.to_hash }
-              end
-            JSON.pretty_generate(data)
-
-          when :friends, :followers # Hash
-            data =
-              if options[:reduce]
-                obj.map { |o| o.to_hash.slice(*PROFILE_SAVE_KEYS) }
-              else
-                obj.map { |o| o.to_hash }
-              end
-            JSON.pretty_generate(data)
-
-          when :friend_ids, :follower_ids # Integer
-            JSON.pretty_generate(obj)
-
-          when :verify_credentials # Twitter::User
-            JSON.pretty_generate(obj.to_hash.slice(*PROFILE_SAVE_KEYS))
-
-          when :user # Twitter::User
-            JSON.pretty_generate(obj.to_hash.slice(*PROFILE_SAVE_KEYS))
-
-          when :users, :friends_parallelly, :followers_parallelly # Twitter::User
-            data =
-              if options[:reduce]
-                obj.map { |o| o.to_hash.slice(*PROFILE_SAVE_KEYS) }
-              else
-                obj.map { |o| o.to_hash }
-              end
-            JSON.pretty_generate(data)
-
-          when :user? # true or false
-            obj
-
-          when :friendship? # true or false
-            obj
-
-          else
-            raise "#{__method__}: caller=#{caller_name} key=#{options[:key]} obj=#{obj.inspect}"
-        end
+      def encode(obj)
+        obj.in?([true, false]) ? obj : CODER.dump(obj)
       end
 
-      # decode
-      def decode_json(json_str, caller_name, options = {})
-        obj = json_str.kind_of?(String) ? JSON.parse(json_str) : json_str
+      def decode(str)
+        obj = str.kind_of?(String) ? CODER.load(str) : str
+        _to_mash(obj)
+      end
+
+      def _to_mash(obj)
         case
-          when obj.nil?
-            obj
-
-          when obj.kind_of?(Array) && obj.first.kind_of?(Hash)
-            obj.map { |o| Hashie::Mash.new(o) }
-
-          when obj.kind_of?(Array) && obj.first.kind_of?(Integer)
-            obj
-
+          when obj.kind_of?(Array)
+            obj.map { |o| _to_mash(o) }
           when obj.kind_of?(Hash)
-            Hashie::Mash.new(obj)
-
-          when obj === true || obj === false
-            obj
-
-          when obj.kind_of?(Array) && obj.empty?
-            obj
-
+            Hashie::Mash.new(obj.map { |k, v| [k, _to_mash(v)] }.to_h)
           else
-            raise "#{__method__}: caller=#{caller_name} key=#{options[:key]} obj=#{obj.inspect}"
+            obj
         end
       end
 
@@ -292,11 +187,11 @@ module TwitterWithAutoPagination
           else
             cache.fetch(key, expires_in: 1.hour, race_condition_ttl: 5.minutes) do
               block_result = yield
-              instrument('serialize', key, caller: method_name) { encode_json(block_result, method_name, options) }
+              instrument('serialize', key, caller: method_name) { encode(block_result) }
             end
           end
 
-        instrument('deserialize', key, caller: method_name) { decode_json(fetch_result, method_name, options) }
+        instrument('deserialize', key, caller: method_name) { decode(fetch_result) }
       end
     end
   end
