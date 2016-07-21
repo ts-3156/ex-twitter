@@ -10,6 +10,7 @@ require 'twitter_with_auto_pagination/rest/extension/favoriting'
 require 'twitter_with_auto_pagination/rest/extension/friends_and_followers'
 require 'twitter_with_auto_pagination/rest/extension/replying'
 require 'twitter_with_auto_pagination/rest/extension/unfollowing'
+require 'twitter_with_auto_pagination/rest/extension/users'
 
 module TwitterWithAutoPagination
   module REST
@@ -26,6 +27,7 @@ module TwitterWithAutoPagination
       include TwitterWithAutoPagination::REST::Extension::FriendsAndFollowers
       include TwitterWithAutoPagination::REST::Extension::Replying
       include TwitterWithAutoPagination::REST::Extension::Unfollowing
+      include TwitterWithAutoPagination::REST::Extension::Users
     end
   end
 end
