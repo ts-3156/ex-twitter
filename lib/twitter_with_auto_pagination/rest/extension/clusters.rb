@@ -7,7 +7,7 @@ module TwitterWithAutoPagination
         include TwitterWithAutoPagination::REST::Utils
 
         def clusters_belong_to(text)
-          return [] if text.blank?
+          return {} if text.blank?
 
           exclude_words = JSON.parse(File.read(Rails.configuration.x.constants['cluster_bad_words_path']))
           special_words = JSON.parse(File.read(Rails.configuration.x.constants['cluster_good_words_path']))
