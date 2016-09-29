@@ -103,7 +103,7 @@ module TwitterWithAutoPagination
       def collect_with_cursor(method_obj, *args)
         options = args.extract_options!
         last_response = call_api(method_obj, *args, options).attrs
-        return_data = (last_response[:users] || last_response[:ids])
+        return_data = (last_response[:users] || last_response[:ids] || last_response[:lists])
 
         while (next_cursor = last_response[:next_cursor]) && next_cursor != 0
           options[:cursor] = next_cursor
@@ -152,10 +152,6 @@ module TwitterWithAutoPagination
         "#{method_name}#{delim}#{identifier}"
       end
 
-      def namespaced_key(method_name, user, options = {})
-        file_cache_key(method_name, user, options)
-      end
-
       CODER = JSON
 
       def encode(obj)
@@ -179,7 +175,7 @@ module TwitterWithAutoPagination
       end
 
       def fetch_cache_or_call_api(method_name, user, options = {})
-        key = namespaced_key(method_name, user, options)
+        key = file_cache_key(method_name, user, options)
 
         fetch_result =
           if options[:cache] == :read

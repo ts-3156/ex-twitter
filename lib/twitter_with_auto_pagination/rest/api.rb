@@ -1,5 +1,6 @@
 require 'twitter_with_auto_pagination/rest/favorites'
 require 'twitter_with_auto_pagination/rest/friends_and_followers'
+require 'twitter_with_auto_pagination/rest/lists'
 require 'twitter_with_auto_pagination/rest/search'
 require 'twitter_with_auto_pagination/rest/timelines'
 require 'twitter_with_auto_pagination/rest/users'
@@ -17,6 +18,7 @@ module TwitterWithAutoPagination
     module API
       include TwitterWithAutoPagination::REST::Favorites
       include TwitterWithAutoPagination::REST::FriendsAndFollowers
+      include TwitterWithAutoPagination::REST::Lists
       include TwitterWithAutoPagination::REST::Search
       include TwitterWithAutoPagination::REST::Timelines
       include TwitterWithAutoPagination::REST::Users
