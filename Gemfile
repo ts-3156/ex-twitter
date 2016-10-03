@@ -4,6 +4,7 @@ gem 'rake'
 gem 'activesupport'
 gem 'hashie'
 gem 'memoist'
+gem 'mecab'
 
 group :development do
   gem 'pry'

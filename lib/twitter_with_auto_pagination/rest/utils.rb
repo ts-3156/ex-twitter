@@ -108,7 +108,7 @@ module TwitterWithAutoPagination
         while (next_cursor = last_response[:next_cursor]) && next_cursor != 0
           options[:cursor] = next_cursor
           last_response = call_api(method_obj, *args, options).attrs
-          return_data += (last_response[:users] || last_response[:ids])
+          return_data += (last_response[:users] || last_response[:ids] || last_response[:lists])
         end
 
         return_data
@@ -122,6 +122,8 @@ module TwitterWithAutoPagination
               "hash-str#{delim}#{credentials_hash}"
             when method_name == :search
               "str#{delim}#{user.to_s}"
+            when method_name == :list_members
+              "list_id#{delim}#{user.to_s}"
             when method_name == :mentions_timeline
               "#{user.kind_of?(Integer) ? 'id' : 'sn'}#{delim}#{user.to_s}"
             when method_name == :home_timeline
