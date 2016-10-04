@@ -6,6 +6,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'activesupport'
   spec.add_dependency 'hashie'
   spec.add_dependency 'parallel'
+  spec.add_dependency 'mecab'
 
   spec.add_development_dependency 'bundler'
 
@@ -22,5 +23,5 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = '>= 2.3'
   spec.summary = spec.description
   spec.test_files = Dir.glob('spec/**/*')
-  spec.version = '0.8.2'
+  spec.version = '0.8.3'
 end
