@@ -45,8 +45,13 @@ module TwitterWithAutoPagination
 
         alias tweet_clusters clusters_belong_to
 
-        def list_clusters(user, each_member: 300, total_member: 1000, rate: 0.3, limit: 10, debug: false)
-          lists = memberships(user).sort_by { |li| li.member_count }
+        def list_clusters(user, shrink: false, each_member: 300, total_member: 1000, rate: 0.3, limit: 10, debug: false)
+          begin
+            lists = memberships(user).sort_by { |li| li.member_count }
+          rescue => e
+            puts "#{e.class}: #{e.message} #{user.inspect}" if debug
+            lists = []
+          end
           puts "lists: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
           return {} if lists.empty?
 
@@ -55,47 +60,48 @@ module TwitterWithAutoPagination
             percentile75 = ((lists.length * 0.75).ceil) - 1
             lists = lists[percentile25..percentile75]
             puts "lists sliced by 25-75 percentile: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
-          end
+          end if shrink
 
           list_special_words = %w()
-          list_exclude_words = %w(list people met)
+          list_exclude_words1 = %r(list[0-9]*|people-ive-faved|twizard-magic-list|my-favstar-fm-list)
+          list_exclude_words2 = %w(it list people met)
 
-          words = lists.map { |li| li.full_name.split('/')[1].split('-') }.flatten.delete_if { |w| w.size < 2 || list_exclude_words.include?(w) }.
-            each_with_object(Hash.new(0)) { |w, memo| memo[w] += 1 }.select { |_, v| (10 < lists.size ? 1 : 0) < v }.sort_by { |k, v| [-v, -k.size] }
+          words = lists.map { |li| li.full_name.split('/')[1] }.
+            select { |n| !n.match(list_exclude_words1) }.
+            map { |n| n.split('-') }.flatten.
+            delete_if { |w| w.size < 2 || list_exclude_words2.include?(w) }.
+            each_with_object(Hash.new(0)) { |w, memo| memo[w] += 1 }.
+            sort_by { |k, v| [-v, -k.size] }
 
           puts "words: #{words.slice(0, 10)}" if debug
           return {} if words.empty?
 
-          word = words[0][0]
-          puts "word: #{word}" if debug
-
-          # TODO: listsの数が小さすぎる場合はwordを増やす
-          lists = lists.select { |li| li.full_name.split('/')[1].include?(word) }
-          puts "lists include specified word: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
+          _words = []
+          lists =
+            filter(lists, min: 2) do |li, i|
+              _words = words[0..i].map(&:first)
+              name = li.full_name.split('/')[1]
+              _words.any? { |w| name.include?(w) }
+            end
+          puts "lists include #{_words.inspect}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
           return {} if lists.empty?
 
-          3.times do
-            _lists = lists.select { |li| (10 < lists.size ? 10 : 0) < li.member_count && li.member_count < each_member }
-            if _lists.size > 2 || _lists.size == lists.size
-              lists = _lists
-              break
-            else
-              each_member *= 1.25
+          _each_member = 0
+          lists =
+            filter(lists, min: 2) do |li, i|
+              _each_member = each_member * (1.0 + 0.25 * i)
+              (10 < lists.size ? 10 : 0) < li.member_count && li.member_count < _each_member
             end
-          end
-          puts "lists limited by each member #{each_member}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
+          puts "lists limited by each member #{_each_member}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
           return {} if lists.empty?
 
-          3.times do
-            _lists = lists.select.with_index { |_, i| lists[0..i].map { |li| li.member_count }.sum < total_member }
-            if _lists.any?
-              lists = _lists
-              break
-            else
-              total_member *= 1.25
+          _total_member = 0
+          lists =
+            filter(lists, min: 1) do |_, i|
+              _total_member = total_member * (1.0 + 0.25 * i)
+              lists[0..i].map { |li| li.member_count }.sum < _total_member
             end
-          end
-          puts "lists limited by total members #{total_member}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
+          puts "lists limited by total members #{_total_member}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
           return {} if lists.empty?
 
           members = lists.map do |li|
@@ -110,7 +116,8 @@ module TwitterWithAutoPagination
           return {} if members.empty?
 
           3.times do
-            _members = members.each_with_object(Hash.new(0)) { |member, memo| memo[member] += 1 }.select { |_, v| lists.size * rate < v }.keys
+            _members = members.each_with_object(Hash.new(0)) { |member, memo| memo[member] += 1 }.
+              select { |_, v| lists.size * rate < v }.keys
             if _members.size > 100
               members = _members
               break
@@ -120,7 +127,6 @@ module TwitterWithAutoPagination
           end
           puts "members included multi lists #{rate}: #{members.size}" if debug
 
-          require 'mecab'
 
           profile_special_words = %w()
           profile_exclude_words = %w(in at of my no er the and for inc Inc com gmail 好き こと 最近 情報 さん ちゃん くん 発言 関係 もの 活動 見解 所属 組織 連絡 大好き サイト ブログ つぶやき こちら アカ アカウント イベント フォロー)
@@ -128,37 +134,49 @@ module TwitterWithAutoPagination
           descriptions = members.map { |m| m.description.remove(URI.regexp) }
 
           candidates, remains = descriptions.partition { |desc| desc.scan('/').size > 2 }
-          slash_freq = count_by_word_with_delim(candidates, delim: '/')
+          slash_freq = count_by_word(candidates, delim: '/')
           puts "words splitted by /: #{slash_freq.to_a.slice(0, 10)}" if debug
 
           candidates, remains = remains.partition { |desc| desc.scan('|').size > 2 }
-          pipe_freq = count_by_word_with_delim(candidates, delim: '|')
+          pipe_freq = count_by_word(candidates, delim: '|')
           puts "words splitted by |: #{pipe_freq.to_a.slice(0, 10)}" if debug
 
-          noun_freq = count_by_word_with_tagger(remains, exclude_words: profile_exclude_words)
-          puts "words with nouns added: #{noun_freq.to_a.slice(0, 10)}" if debug
+          require 'mecab'
+          tagger = MeCab::Tagger.new("-d #{`mecab-config --dicdir`.chomp}/mecab-ipadic-neologd/")
+
+          noun_freq = count_by_word(remains, tagger: tagger, exclude_words: profile_exclude_words)
+          puts "words tagged as noun: #{noun_freq.to_a.slice(0, 10)}" if debug
 
           slash_freq.merge(pipe_freq) { |_, old, neww| old + neww }.merge(noun_freq) { |_, old, neww| old + neww }.sort_by { |k, v| [-v, -k.size] }.slice(0, limit)
         end
 
         private
 
-        def count_by_word_with_delim(texts, delim:)
-          texts.map { |t| t.split(delim) }.flatten.
-            map(&:strip).
-            delete_if { |w| w.empty? || w.size < 2 || 5 < w.size }.
-            each_with_object(Hash.new(0)) { |w, memo| memo[w] += 1 }.
-            sort_by { |k, v| [-v, -k.size] }.to_h
+        def filter(lists, min:)
+          min = [min, lists.size].min
+          _lists = []
+          3.times do |i|
+            _lists = lists.select { |li| yield(li, i) }
+            break if _lists.size >= min
+          end
+          _lists
         end
 
-        def count_by_word_with_tagger(texts, tagger: nil, exclude_words: [])
-          tagger = MeCab::Tagger.new("-d #{`mecab-config --dicdir`.chomp}/mecab-ipadic-neologd/") if tagger.nil?
-          nouns = tagger.parse(texts.join(' ')).split("\n").
-            select { |line| line.include?('名詞') }.
-            map { |line| line.split("\t")[0] }.
-            delete_if { |w| w.empty? || w.size < 2 || 5 < w.size || exclude_words.include?(w) }
+        def count_by_word(texts, delim: nil, tagger: nil, exclude_words: [])
+          texts = texts.dup
 
-          nouns.each_with_object(Hash.new(0)) { |noun, memo| memo[noun] += 1 }.
+          if delim
+            texts = texts.map { |t| t.split(delim) }.flatten.map(&:strip)
+          end
+
+          if tagger
+            texts = tagger.parse(texts.join(' ')).split("\n").
+              select { |line| line.include?('名詞') }.
+              map { |line| line.split("\t")[0] }
+          end
+
+          texts.delete_if { |w| w.empty? || w.size < 2 || 5 < w.size || exclude_words.include?(w) }.
+            each_with_object(Hash.new(0)) { |word, memo| memo[word] += 1 }.
             sort_by { |k, v| [-v, -k.size] }.to_h
         end
       end
