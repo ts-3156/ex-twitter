@@ -1,21 +1,38 @@
-require 'active_support'
-require 'active_support/core_ext'
-
-
 module TwitterWithAutoPagination
   class LogSubscriber < ActiveSupport::LogSubscriber
 
     def initialize
       super
-      @odd = false
+    end
+
+    def call(event)
+      return unless logger.debug?
+
+      payload = event.payload
+      name = "TW::#{payload.delete(:operation)} (#{event.duration.round(1)}ms)"
+      name = color(name, CYAN, true) # WHITE, RED, GREEN, BLUE, CYAN, MAGENTA, YELLOW
+      debug { "#{name} #{(payload.inspect)}" }
+    end
+
+    private
+
+    def logger
+      Twitter::REST::Client.logger
+    end
+  end
+
+  class ASLogSubscriber < ActiveSupport::LogSubscriber
+
+    def initialize
+      super
     end
 
     def cache_any(event)
       return unless logger.debug?
 
       payload = event.payload
-      name  = "#{payload.delete(:name)} (#{event.duration.round(1)}ms)"
-      name = colorize_payload_name(name, payload[:name], AS: true)
+      name= "AS::#{payload.delete(:name)} (#{event.duration.round(1)}ms)"
+      name = color(name, MAGENTA, true)
       debug { "#{name} #{(payload.inspect)}" }
     end
 
@@ -28,49 +45,7 @@ module TwitterWithAutoPagination
       METHOD
     end
 
-    def call(event)
-      return unless logger.debug?
-
-      payload = event.payload
-      name = "#{payload.delete(:operation)} (#{event.duration.round(1)}ms)"
-
-      name = colorize_payload_name(name, payload[:name])
-      # sql  = color(sql, sql_color(sql), true)
-
-      key = payload.delete(:key)
-      debug { "#{name}#{key.nil? ? '' : " #{key}"} #{(payload.inspect)}" }
-    end
-
     private
-
-    def colorize_payload_name(name, payload_name, options = {})
-      if options[:AS]
-        color(name, MAGENTA, true)
-      else
-        color(name, CYAN, true)
-      end
-    end
-
-    def sql_color(sql)
-      case sql
-        when /\A\s*rollback/mi
-          RED
-        when /select .*for update/mi, /\A\s*lock/mi
-          WHITE
-        when /\A\s*select/i
-          BLUE
-        when /\A\s*insert/i
-          GREEN
-        when /\A\s*update/i
-          YELLOW
-        when /\A\s*delete/i
-          RED
-        when /transaction\s*\Z/i
-          CYAN
-        else
-          MAGENTA
-      end
-    end
 
     def logger
       Twitter::REST::Client.logger
@@ -79,4 +54,4 @@ module TwitterWithAutoPagination
 end
 
 TwitterWithAutoPagination::LogSubscriber.attach_to :twitter_with_auto_pagination
-TwitterWithAutoPagination::LogSubscriber.attach_to :active_support
+TwitterWithAutoPagination::ASLogSubscriber.attach_to :active_support
