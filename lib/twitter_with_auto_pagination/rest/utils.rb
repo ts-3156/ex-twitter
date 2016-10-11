@@ -4,37 +4,6 @@ require 'digest/md5'
 module TwitterWithAutoPagination
   module REST
     module Utils
-      # for backward compatibility
-      def uid
-        @uid || user.id.to_i
-      end
-
-      def __uid
-        ActiveSupport::Deprecation.warn(<<-MESSAGE.strip_heredoc)
-          `TwitterWithAutoPagination::Utils##{__method__}` is deprecated.
-        MESSAGE
-        uid
-      end
-
-      def __uid_i
-        ActiveSupport::Deprecation.warn(<<-MESSAGE.strip_heredoc)
-          `TwitterWithAutoPagination::Utils##{__method__}` is deprecated.
-        MESSAGE
-        uid
-      end
-
-      # for backward compatibility
-      def screen_name
-        @screen_name || user.screen_name
-      end
-
-      def __screen_name
-        ActiveSupport::Deprecation.warn(<<-MESSAGE.strip_heredoc)
-          `TwitterWithAutoPagination::Utils##{__method__}` is deprecated.
-        MESSAGE
-        screen_name
-      end
-
       def uid_or_screen_name?(object)
         object.kind_of?(String) || object.kind_of?(Integer)
       end
@@ -49,23 +18,21 @@ module TwitterWithAutoPagination
       end
 
       def credentials_hash
-        str = access_token + access_token_secret + consumer_key + consumer_secret
-        Digest::MD5.hexdigest(str)
+        Digest::MD5.hexdigest(access_token + access_token_secret + consumer_key + consumer_secret)
       end
 
       def instrument(operation, key, options = nil)
-        payload = {operation: operation, key: key}
+        payload = {operation: operation}
         payload.merge!(options) if options.is_a?(Hash)
         ActiveSupport::Notifications.instrument('call.twitter_with_auto_pagination', payload) { yield(payload) }
       end
 
-      def call_api(method_obj, *args)
+      def call_api(method, *args)
         api_options = args.extract_options!
+        self.call_count += 1
+        options = {method: method.name, call_count: self.call_count, args: [*args, api_options]}
         begin
-          self.call_count += 1
-          # TODO call without reduce, call_count
-          options = {method_name: method_obj.name, call_count: self.call_count, args: [*args, api_options]}
-          instrument('request', args[0], options) { method_obj.call(*args, api_options) }
+          instrument('request', nil, options) { method.call(*args, api_options) }
         rescue Twitter::Error::TooManyRequests => e
           logger.warn "#{__method__}: #{options.inspect} #{e.class} Retry after #{e.rate_limit.reset_in} seconds."
           raise e
@@ -74,68 +41,74 @@ module TwitterWithAutoPagination
           logger.warn "#{__method__}: #{options.inspect} #{e.class} #{e.message}"
           raise e
         rescue => e
-          logger.warn "NEED TO CATCH! #{__method__}: #{options.inspect} #{e.class} #{e.message}"
+          logger.warn "CATCH ME! #{__method__}: #{options.inspect} #{e.class} #{e.message}"
           raise e
         end
       end
 
       # user_timeline, search
-      def collect_with_max_id(method_obj, *args)
+      def collect_with_max_id(method, *args)
         options = args.extract_options!
         call_limit = options.delete(:call_limit) || 3
-        last_response = call_api(method_obj, *args, options)
-        last_response = yield(last_response) if block_given?
-        return_data = last_response
-        call_count = 1
+        return_data = []
+        call_num = 0
 
-        while last_response.any? && call_count < call_limit
-          options[:max_id] = last_response.last.kind_of?(Hash) ? last_response.last[:id] : last_response.last.id
-          last_response = call_api(method_obj, *args, options)
+        while call_num < call_limit
+          last_response = call_api(method, *args, options)
           last_response = yield(last_response) if block_given?
+          call_num += 1
           return_data += last_response
-          call_count += 1
-        end
-
-        return_data.flatten
-      end
-
-      # friends, followers
-      def collect_with_cursor(method_obj, *args)
-        options = args.extract_options!
-        last_response = call_api(method_obj, *args, options).attrs
-        return_data = (last_response[:users] || last_response[:ids] || last_response[:lists])
-
-        while (next_cursor = last_response[:next_cursor]) && next_cursor != 0
-          options[:cursor] = next_cursor
-          last_response = call_api(method_obj, *args, options).attrs
-          return_data += (last_response[:users] || last_response[:ids] || last_response[:lists])
+          if last_response.nil? || last_response.empty?
+            break
+          else
+            options[:max_id] = last_response.last.kind_of?(Hash) ? last_response.last[:id] : last_response.last.id
+          end
         end
 
         return_data
       end
 
-      def file_cache_key(method_name, user, options = {})
+      # friends, followers
+      def collect_with_cursor(method, *args)
+        options = args.extract_options!
+        return_data = []
+        call_num = 0
+
+        while call_num < 30
+          last_response = call_api(method, *args, options).attrs
+          call_num += 1
+          return_data += (last_response[:users] || last_response[:ids] || last_response[:lists])
+          options[:cursor] = last_response[:next_cursor]
+          if options[:cursor].nil? || options[:cursor] == 0
+            break
+          end
+        end
+
+        return_data
+      end
+
+      def normalize_key(method, user, options = {})
         delim = ':'
         identifier =
           case
-            when method_name == :verify_credentials
-              "hash-str#{delim}#{credentials_hash}"
-            when method_name == :search
+            when method == :verify_credentials
+              "token-hash#{delim}#{credentials_hash}"
+            when method == :search
               "str#{delim}#{user.to_s}"
-            when method_name == :list_members
+            when method == :list_members
               "list_id#{delim}#{user.to_s}"
-            when method_name == :mentions_timeline
+            when method == :mentions_timeline
               "#{user.kind_of?(Integer) ? 'id' : 'sn'}#{delim}#{user.to_s}"
-            when method_name == :home_timeline
+            when method == :home_timeline
               "#{user.kind_of?(Integer) ? 'id' : 'sn'}#{delim}#{user.to_s}"
-            when method_name.in?([:users, :replying]) && options[:super_operation].present?
+            when method.in?([:users, :replying]) && options[:super_operation].present?
               case
                 when user.kind_of?(Array) && user.first.kind_of?(Integer)
                   "#{options[:super_operation]}-ids#{delim}#{Digest::MD5.hexdigest(user.join(','))}"
                 when user.kind_of?(Array) && user.first.kind_of?(String)
                   "#{options[:super_operation]}-sns#{delim}#{Digest::MD5.hexdigest(user.join(','))}"
                 else
-                  raise "#{method_name.inspect} #{user.inspect}"
+                  raise "#{method.inspect} #{user.inspect}"
               end
             when user.kind_of?(Integer)
               "id#{delim}#{user.to_s}"
@@ -148,10 +121,10 @@ module TwitterWithAutoPagination
             when user.kind_of?(Twitter::User)
               "user#{delim}#{user.id.to_s}"
             else
-              raise "#{method_name.inspect} #{user.inspect}"
+              raise "#{method.inspect} #{user.inspect}"
           end
 
-        "#{method_name}#{delim}#{identifier}"
+        "#{method}#{delim}#{identifier}"
       end
 
       CODER = JSON
@@ -162,34 +135,30 @@ module TwitterWithAutoPagination
 
       def decode(str)
         obj = str.kind_of?(String) ? CODER.load(str) : str
-        _to_mash(obj)
+        to_mash(obj)
       end
 
-      def _to_mash(obj)
+      def to_mash(obj)
         case
           when obj.kind_of?(Array)
-            obj.map { |o| _to_mash(o) }
+            obj.map { |o| to_mash(o) }
           when obj.kind_of?(Hash)
-            Hashie::Mash.new(obj.map { |k, v| [k, _to_mash(v)] }.to_h)
+            Hashie::Mash.new(obj.map { |k, v| [k, to_mash(v)] }.to_h)
           else
             obj
         end
       end
 
-      def fetch_cache_or_call_api(method_name, user, options = {})
-        key = file_cache_key(method_name, user, options)
+      def fetch_cache_or_call_api(method, user, options = {})
+        key = normalize_key(method, user, options)
 
         fetch_result =
-          if options[:cache] == :read
-            instrument('Cache Read(Force)', key, caller: method_name) { cache.read(key) }
-          else
-            cache.fetch(key, expires_in: 1.hour, race_condition_ttl: 5.minutes) do
-              block_result = yield
-              instrument('serialize', key, caller: method_name) { encode(block_result) }
-            end
+          cache.fetch(key, expires_in: 1.hour, race_condition_ttl: 5.minutes) do
+            block_result = yield
+            instrument('serialize', nil, key: key, caller: method) { encode(block_result) }
           end
 
-        instrument('deserialize', key, caller: method_name) { decode(fetch_result) }
+        instrument('deserialize', nil, key: key, caller: method) { decode(fetch_result) }
       end
     end
   end

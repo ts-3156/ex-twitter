@@ -17,7 +17,7 @@ module TwitterWithAutoPagination
 
       def user?(*args)
         options = args.extract_options!
-        args[0] = verify_credentials.id if args.empty?
+        return false if args.empty? || args[0].nil? || !args[0].to_s.match(/\A([a-zA-Z0-9_]{1,20}|[1-9][0-9]*)\z/)
         instrument(__method__, nil, options) do
           fetch_cache_or_call_api(__method__, args[0], options) do
             call_api(method(__method__).super_method, *args, options)
@@ -27,7 +27,7 @@ module TwitterWithAutoPagination
 
       def user(*args)
         options = args.extract_options!
-        args[0] = verify_credentials.id if args.empty?
+        args[0] = verify_credentials(super_operation: __method__).id if args.empty?
         instrument(__method__, nil, options) do
           fetch_cache_or_call_api(__method__, args[0], options) do
             call_api(method(__method__).super_method, *args, options).to_hash

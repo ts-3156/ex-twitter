@@ -1,3 +1,5 @@
+require 'active_support'
+require 'active_support/core_ext'
 require 'twitter'
 
 require 'twitter_with_auto_pagination/log_subscriber'
@@ -15,9 +17,6 @@ module Twitter
       def initialize(options = {})
         @cache = ActiveSupport::Cache::FileStore.new(File.join('tmp', 'api_cache'))
         @call_count = 0
-
-        @uid = options.has_key?(:uid) ? options.delete(:uid).to_i : nil
-        @screen_name = options.has_key?(:screen_name) ? options.delete(:screen_name).to_s : nil
 
         logger =
           if options.has_key?(:logger)
