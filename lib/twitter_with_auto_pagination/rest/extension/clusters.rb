@@ -6,9 +6,9 @@ module TwitterWithAutoPagination
       module Clusters
         include TwitterWithAutoPagination::REST::Utils
 
-        # @param text [String] user_timeline.map(&:text).join(' ')
-        def clusters_belong_to(text, limit: 10)
-          return {} if text.blank?
+        def tweet_clusters(tweets, limit: 10)
+          return {} if tweets.blank?
+          text = tweets.map(&:text).join(' ')
 
           if defined?(Rails)
             exclude_words = JSON.parse(File.read(Rails.configuration.x.constants['cluster_bad_words_path']))
@@ -40,12 +40,30 @@ module TwitterWithAutoPagination
             each { |w| frequency[w] += 1 }
 
           # 複数個以上見付かった単語のみを残し、出現頻度順にソート
-          frequency.select { |_, v| 2 < v }.sort_by { |_, v| -v }.slice(0, limit).to_h
+          frequency.select { |_, v| 2 < v }.sort_by { |k, v| [-v, -k.size] }.slice(0, limit).to_h
         end
 
-        alias tweet_clusters clusters_belong_to
+        def hashtag_clusters(tweets, limit: 10, debug: false)
+          puts "tweets: #{tweets.size}" if debug
+          return {} if tweets.blank?
+
+          tweets = tweets.select { |t| t.text && t.text.include?('#') }
+          puts "tweets with hashtag: #{tweets.size}" if debug
+
+          hashtags = tweets.map { |t| t.text.scan(/[#＃][Ａ-Ｚａ-ｚA-Za-z一-鿆0-9０-９ぁ-ヶｦ-ﾟー]+/).map(&:strip) }.flatten
+          puts "hashtags: #{hashtags.size}" if debug
+
+          hashtags.each_with_object(Hash.new(0)) { |h, memo| memo[h] += 1 }.sort_by { |k, v| [-v, -k.size] }.slice(0, limit).to_h
+        end
 
         def list_clusters(user, shrink: false, each_member: 300, total_member: 1000, rate: 0.3, limit: 10, debug: false)
+          begin
+            require 'mecab'
+          rescue => e
+            puts "Add gem 'mecab' to your Gemfile."
+            return nil
+          end
+
           begin
             lists = memberships(user).sort_by { |li| li.member_count }
           rescue => e
@@ -141,9 +159,7 @@ module TwitterWithAutoPagination
           pipe_freq = count_by_word(candidates, delim: '|')
           puts "words splitted by |: #{pipe_freq.to_a.slice(0, 10)}" if debug
 
-          require 'mecab'
           tagger = MeCab::Tagger.new("-d #{`mecab-config --dicdir`.chomp}/mecab-ipadic-neologd/")
-
           noun_freq = count_by_word(remains, tagger: tagger, exclude_words: profile_exclude_words)
           puts "words tagged as noun: #{noun_freq.to_a.slice(0, 10)}" if debug
 
