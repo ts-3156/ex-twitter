@@ -50,7 +50,7 @@ module TwitterWithAutoPagination
           tweets = tweets.select { |t| t.text && t.text.include?('#') }
           puts "tweets with hashtag: #{tweets.size}" if debug
 
-          hashtags = tweets.map { |t| t.text.scan(/[#＃][Ａ-Ｚａ-ｚA-Za-z一-鿆0-9０-９ぁ-ヶｦ-ﾟー]+/).map(&:strip) }.flatten
+          hashtags = tweets.map { |t| t.text.scan(/[#＃][Ａ-Ｚａ-ｚA-Za-z_一-鿆0-9０-９ぁ-ヶｦ-ﾟー]+/).map(&:strip) }.flatten
           puts "hashtags: #{hashtags.size}" if debug
 
           hashtags.each_with_object(Hash.new(0)) { |h, memo| memo[h] += 1 }.sort_by { |k, v| [-v, -k.size] }.slice(0, limit).to_h
