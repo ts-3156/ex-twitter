@@ -34,14 +34,14 @@ module TwitterWithAutoPagination
         begin
           instrument('request', nil, options) { method.call(*args, api_options) }
         rescue Twitter::Error::TooManyRequests => e
-          logger.warn "#{__method__}: #{options.inspect} #{e.class} Retry after #{e.rate_limit.reset_in} seconds."
+          logger.warn "#{__method__}: #{e.class} #{e.message} Retry after #{e.rate_limit.reset_in} seconds. #{options.inspect}"
           raise e
         rescue Twitter::Error::ServiceUnavailable, Twitter::Error::InternalServerError,
           Twitter::Error::Forbidden, Twitter::Error::NotFound => e
-          logger.warn "#{__method__}: #{options.inspect} #{e.class} #{e.message}"
+          logger.warn "#{__method__}: #{e.class} #{e.message} #{options.inspect}"
           raise e
         rescue => e
-          logger.warn "CATCH ME! #{__method__}: #{options.inspect} #{e.class} #{e.message}"
+          logger.warn "CATCH ME! #{__method__}: #{e.class} #{e.message} #{options.inspect}"
           raise e
         end
       end
@@ -71,10 +71,11 @@ module TwitterWithAutoPagination
       # friends, followers
       def collect_with_cursor(method, *args)
         options = args.extract_options!
+        call_limit = options.delete(:call_limit) || 30
         return_data = []
         call_num = 0
 
-        while call_num < 30
+        while call_num < call_limit
           last_response = call_api(method, *args, options).attrs
           call_num += 1
           return_data += (last_response[:users] || last_response[:ids] || last_response[:lists])

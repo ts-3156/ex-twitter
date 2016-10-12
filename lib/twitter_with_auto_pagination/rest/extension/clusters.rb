@@ -56,7 +56,7 @@ module TwitterWithAutoPagination
           hashtags.each_with_object(Hash.new(0)) { |h, memo| memo[h] += 1 }.sort_by { |k, v| [-v, -k.size] }.slice(0, limit).to_h
         end
 
-        def list_clusters(user, shrink: false, each_member: 300, total_member: 1000, rate: 0.3, limit: 10, debug: false)
+        def list_clusters(user, shrink: false, shrink_limit: 100, list_member: 300, total_member: 3000, total_list: 50, rate: 0.3, limit: 10, debug: false)
           begin
             require 'mecab'
           rescue => e
@@ -65,35 +65,32 @@ module TwitterWithAutoPagination
           end
 
           begin
-            lists = memberships(user).sort_by { |li| li.member_count }
-          rescue => e
-            puts "#{e.class}: #{e.message} #{user.inspect}" if debug
+            lists = memberships(user, count: 500, call_limit: 2).sort_by { |li| li.member_count }
+          rescue Twitter::Error::ServiceUnavailable => e
+            puts "#{__method__}: #{e.class} #{e.message} #{user.inspect}" if debug
             lists = []
           end
           puts "lists: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
           return {} if lists.empty?
 
-          while lists.size > 200
-            percentile25 = ((lists.length * 0.25).ceil) - 1
-            percentile75 = ((lists.length * 0.75).ceil) - 1
-            lists = lists[percentile25..percentile75]
-            puts "lists sliced by 25-75 percentile: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
-          end if shrink
+          open('lists.txt', 'w') {|f| f.write lists.map(&:full_name).join("\n") } if debug
 
           list_special_words = %w()
-          list_exclude_words1 = %r(list[0-9]*|people-ive-faved|twizard-magic-list|my-favstar-fm-list)
-          list_exclude_words2 = %w(it list people met)
+          list_exclude_names = %r(list[0-9]*|people-ive-faved|twizard-magic-list|my-favstar-fm-list|timeline-list|conversationlist|who-i-met)
+          list_exclude_words = %w(it list people who met)
 
+          # リスト名を - で分割 -> 1文字の単語を除去 -> 出現頻度の降順でソート
           words = lists.map { |li| li.full_name.split('/')[1] }.
-            select { |n| !n.match(list_exclude_words1) }.
+            select { |n| !n.match(list_exclude_names) }.
             map { |n| n.split('-') }.flatten.
-            delete_if { |w| w.size < 2 || list_exclude_words2.include?(w) }.
+            delete_if { |w| w.size < 2 || list_exclude_words.include?(w) }.
             each_with_object(Hash.new(0)) { |w, memo| memo[w] += 1 }.
             sort_by { |k, v| [-v, -k.size] }
 
           puts "words: #{words.slice(0, 10)}" if debug
           return {} if words.empty?
 
+          # 出現頻度の高い単語を名前に含むリストを抽出
           _words = []
           lists =
             filter(lists, min: 2) do |li, i|
@@ -104,34 +101,58 @@ module TwitterWithAutoPagination
           puts "lists include #{_words.inspect}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
           return {} if lists.empty?
 
-          _each_member = 0
+          # 中間の 25-75% のリストを抽出
+          while lists.size > shrink_limit
+            percentile25 = ((lists.length * 0.25).ceil) - 1
+            percentile75 = ((lists.length * 0.75).ceil) - 1
+            lists = lists[percentile25..percentile75]
+            puts "lists sliced by 25-75 percentile: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
+          end if shrink || lists.size > shrink_limit
+
+          # メンバー数がしきい値より少ないリストを抽出
+          _list_member = 0
+          _min_list_member = 10 < lists.size ? 10 : 0
           lists =
             filter(lists, min: 2) do |li, i|
-              _each_member = each_member * (1.0 + 0.25 * i)
-              (10 < lists.size ? 10 : 0) < li.member_count && li.member_count < _each_member
+              _list_member = list_member * (1.0 + 0.25 * i)
+              _min_list_member < li.member_count && li.member_count < _list_member
             end
-          puts "lists limited by each member #{_each_member}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
+          puts "lists limited by list member #{_min_list_member}..#{_list_member.round}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
           return {} if lists.empty?
 
-          _total_member = 0
-          lists =
-            filter(lists, min: 1) do |_, i|
-              _total_member = total_member * (1.0 + 0.25 * i)
-              lists[0..i].map { |li| li.member_count }.sum < _total_member
+          # トータルメンバー数がしきい値より少なくなるリストを抽出
+          _lists = []
+          lists.size.times do |i|
+            _lists = lists[0..(-1 - i)]
+            if _lists.map { |li| li.member_count }.sum < total_member
+              break
+            else
+              _lists = []
             end
-          puts "lists limited by total members #{_total_member}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
+          end
+          lists = _lists.empty? ? [lists[0]] : _lists
+          puts "lists limited by total members #{total_member}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
+          return {} if lists.empty?
+
+          # リスト数がしきい値より少なくなるリストを抽出
+          if lists.size > total_list
+            lists = lists[0..(total_list - 1)]
+          end
+          puts "lists limited by total lists #{total_list}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
           return {} if lists.empty?
 
           members = lists.map do |li|
             begin
               list_members(li.id)
-            rescue => e
-              puts "#{e.class}: #{e.message} #{li.id} #{li.full_name} #{li.mode}" if debug
+            rescue Twitter::Error::NotFound => e
+              puts "#{__method__}: #{e.class} #{e.message} #{li.id} #{li.full_name} #{li.mode}" if debug
               nil
             end
           end.compact.flatten
           puts "candidate members: #{members.size}" if debug
           return {} if members.empty?
+
+          open('members.txt', 'w') {|f| f.write members.map{ |m| m.description.gsub(/\R/, ' ') }.join("\n") } if debug
 
           3.times do
             _members = members.each_with_object(Hash.new(0)) { |member, memo| memo[member] += 1 }.
@@ -140,14 +161,14 @@ module TwitterWithAutoPagination
               members = _members
               break
             else
-              rate += 0.1
+              rate -= 0.05
             end
           end
-          puts "members included multi lists #{rate}: #{members.size}" if debug
+          puts "members included multi lists #{rate.round(3)}: #{members.size}" if debug
 
 
           profile_special_words = %w()
-          profile_exclude_words = %w(in at of my no er the and for inc Inc com gmail 好き こと 最近 情報 さん ちゃん くん 発言 関係 もの 活動 見解 所属 組織 連絡 大好き サイト ブログ つぶやき こちら アカ アカウント イベント フォロー)
+          profile_exclude_words = %w(in at of my no er the and for inc Inc com info gmail 好き こと 最近 連載 発売 依頼 情報 さん ちゃん くん 発言 関係 もの 活動 見解 所属 組織 代表 連絡 大好き サイト ブログ つぶやき 株式会社 こちら 届け お仕事 アカ アカウント ツイート たま ブロック 時間 お願い お願いします お願いいたします イベント フォロー)
 
           descriptions = members.map { |m| m.description.remove(URI.regexp) }
 

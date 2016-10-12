@@ -42,7 +42,7 @@ module TwitterWithAutoPagination
         rescue Twitter::Error::NotFound => e
           e.message == 'No user matches for specified terms.' ? [] : (raise e)
         rescue => e
-          logger.warn "#{__method__} #{args.inspect} #{e.class} #{e.message}"
+          logger.warn "#{__method__}: #{e.class} #{e.message} #{args.inspect}"
           raise e
         end
 
