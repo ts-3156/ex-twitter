@@ -116,20 +116,13 @@ module TwitterWithAutoPagination
         end
       end
 
-      def usage_stats(user, options = {})
-        n_days_ago = options.has_key?(:days) ? options[:days].days.ago : 100.years.ago
-        tweets = options.has_key?(:tweets) ? options.delete(:tweets) : user_timeline(user)
-        day_names = options.has_key?(:day_names) ? options.delete(:day_names) : %w(Sun Mon Tue Wed Thu Fri Sat)
-        times =
-          # TODO Use user specific time zone
-          tweets.map { |t| ActiveSupport::TimeZone['Tokyo'].parse(t.created_at.to_s) }.
-            select { |t| t > n_days_ago }
+      def usage_stats(tweet_times, day_names: %w(Sun Mon Tue Wed Thu Fri Sat))
         [
-          usage_stats_wday_series_data(times, day_names: day_names),
-          usage_stats_wday_drilldown_series(times, day_names: day_names),
-          usage_stats_hour_series_data(times),
-          usage_stats_hour_drilldown_series(times, day_names: day_names),
-          twitter_addiction_series(times, day_names: day_names)
+          usage_stats_wday_series_data(tweet_times, day_names: day_names),
+          usage_stats_wday_drilldown_series(tweet_times, day_names: day_names),
+          usage_stats_hour_series_data(tweet_times),
+          usage_stats_hour_drilldown_series(tweet_times, day_names: day_names),
+          twitter_addiction_series(tweet_times, day_names: day_names)
         ]
       end
     end
