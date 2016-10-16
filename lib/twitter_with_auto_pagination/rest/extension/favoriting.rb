@@ -73,15 +73,12 @@ module TwitterWithAutoPagination
           end
         end
 
-        def close_friends(*args)
-          options = {uniq: false}.merge(args.extract_options!)
-          min_max = {
-            min: options.has_key?(:min) ? options.delete(:min) : 0,
-            max: options.has_key?(:max) ? options.delete(:max) : 1000
-          }
+        def close_friends(user, uniq: false, min: 0, max: 1000, limit: 30)
+          options = {uniq: uniq, min: min, max: max}
+          min_max = {min: min, max: max}
 
           instrument(__method__, nil, options) do
-            replying, replied, favoriting = _retrieve_replying_replied_and_favoriting(*args, options)
+            replying, replied, favoriting = _retrieve_replying_replied_and_favoriting(user, options)
 
             users = replying + replied + favoriting
             return [] if users.empty?
@@ -97,7 +94,7 @@ module TwitterWithAutoPagination
               u[:replied_score] = replied_score[u.id]
               u[:favoriting_score] = favoriting_score[u.id]
               u
-            end
+            end.slice(0, limit)
           end
         end
       end
