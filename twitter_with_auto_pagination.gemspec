@@ -22,5 +22,5 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = '>= 2.3'
   spec.summary = spec.description
   spec.test_files = Dir.glob('spec/**/*')
-  spec.version = '0.8.10'
+  spec.version = '0.8.11'
 end
