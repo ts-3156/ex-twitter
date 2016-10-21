@@ -32,7 +32,7 @@ module Twitter
       end
 
       def self.logger
-        @@logger
+        @@logger ||= nil
       end
 
       attr_accessor :call_count, :logger
