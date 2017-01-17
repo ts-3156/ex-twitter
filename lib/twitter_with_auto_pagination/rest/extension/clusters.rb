@@ -8,7 +8,7 @@ module TwitterWithAutoPagination
 
         PROFILE_SPECIAL_WORDS = %w(20↑ 成人済 腐女子)
         PROFILE_SPECIAL_REGEXP = nil
-        PROFILE_EXCLUDE_WORDS = %w(in at of my to no er by is RT DM the and for you inc Inc com from info next gmail 好き こと 最近 紹介 連載 発売 依頼 情報 さん ちゃん くん 発言 関係 もの 活動 見解 所属 組織 代表 連絡 大好き サイト ブログ つぶやき 株式会社 最新 こちら 届け お仕事 ツイ 返信 プロ 今年 リプ ヘッダー アイコン アカ アカウント ツイート たま ブロック 無言 時間 お願い お願いします お願いいたします イベント フォロー フォロワー フォロバ スタッフ 自動 手動 迷言 名言 非公式 リリース 問い合わせ ツイッター)
+        PROFILE_EXCLUDE_WORDS = %w(in at of my to no er by is RT DM the and for you inc Inc com from info next gmail 好き こと 最近 紹介 連載 発売 依頼 情報 さん ちゃん くん 発言 関係 もの 活動 見解 所属 組織 代表 連絡 大好き サイト ブログ つぶやき 株式会社 最新 こちら 届け お仕事 ツイ 返信 プロ 今年 リプ ヘッダー アイコン アカ アカウント ツイート たま ブロック 無言 時間 お願い お願いします お願いいたします イベント フォロー フォロワー フォロバ スタッフ 自動 手動 迷言 名言 非公式 リリース 問い合わせ ツイッター DVD 発売中 出身)
         PROFILE_EXCLUDE_REGEXP = Regexp.union(/\w+@\w+\.(com|co\.jp)/, %r[\d{2,4}(年|/)\d{1,2}(月|/)\d{1,2}日], %r[\d{1,2}/\d{1,2}], /\d{2}th/, URI.regexp)
 
         def tweet_clusters(tweets, limit: 10, debug: false)
@@ -101,45 +101,63 @@ module TwitterWithAutoPagination
           count_freq_words(members.map { |m| m.description  }, special_words: PROFILE_SPECIAL_WORDS, exclude_words: PROFILE_EXCLUDE_WORDS, special_regexp: PROFILE_SPECIAL_REGEXP, exclude_regexp: PROFILE_EXCLUDE_REGEXP, debug: debug).take(limit)
         end
 
-        def fetch_lists(user, debug: false)
-          memberships(user, count: 500, call_limit: 2).sort_by { |li| li.member_count }
-        rescue Twitter::Error::ServiceUnavailable => e
-          puts "#{__method__}: #{e.class} #{e.message} #{user.inspect}" if debug
-          []
+        def list_name_debug(screen_names)
+          lists = screen_names.map do |sn|
+            puts "fetch #{sn}"
+            memberships(sn, count: 500, call_limit: 2)
+          end.flatten
+          list_exclude_regexp = %r(list[0-9]*|people-ive-faved|twizard-magic-list|my-favstar-fm-list|timeline-list|conversationlist|who-i-met)
+          name_exclude_regexp = %r(it|fav|famous|etc|list|people|who|met|abc|and|\d+)
+
+          words = lists.map { |li| li.full_name.split('/')[1] }
+              .select { |n| !n.match(list_exclude_regexp) }
+              .map { |n| n.split('-') }.flatten
+              .delete_if { |w| w.size < 2 || w.match(name_exclude_regexp) }
+              .map { |w| normalize_synonym(w) }
+              .each_with_object(Hash.new(0)) { |w, memo| memo[w] += 1 }
+              .sort_by { |k, v| [-v, -k.size] }
+          words.delete_if { |_, v| v == 1 } if words.select { |_, v| v >= 2 }.any?
+
+          File.write('words.txt', words.map(&:first).uniq.sort.select { |w| SYNONYM_WORDS.none? { |sy| sy.include? w } }.join("\n"))
         end
 
-        def list_clusters(lists, shrink: false, shrink_limit: 100, list_member: 300, total_member: 3000, total_list: 50, rate: 0.3, limit: 10, debug: false)
+        def list_clusters(user, lists: nil, shrink_limit: 100, list_member: 300, total_member: 3000, total_list: 30, rate: 0.3, limit: 10, debug: false)
+          lists = memberships(user, count: 500, call_limit: 2) unless lists
           lists = lists.sort_by { |li| li.member_count }
-          puts "lists: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
+
+          puts "#{lists.size} lists" if debug
           return {} if lists.empty?
 
-          open('lists.txt', 'w') {|f| f.write lists.map(&:full_name).join("\n") } if debug
+          File.write('lists.txt', lists.map(&:full_name).join("\n")) if debug
 
-          list_special_words = %w()
           list_exclude_regexp = %r(list[0-9]*|people-ive-faved|twizard-magic-list|my-favstar-fm-list|timeline-list|conversationlist|who-i-met)
-          list_exclude_words = %w(it list people who met)
+          name_exclude_regexp = %r(it|fav|famous|etc|list|people|who|met|abc|and|\d+)
 
           # リスト名を - で分割 -> 1文字の単語を除去 -> 出現頻度の降順でソート
-          words = lists.map { |li| li.full_name.split('/')[1] }.
-            select { |n| !n.match(list_exclude_regexp) }.
-            map { |n| n.split('-') }.flatten.
-            delete_if { |w| w.size < 2 || list_exclude_words.include?(w) }.
-            map { |w| SYNONYM_WORDS.has_key?(w) ? SYNONYM_WORDS[w] : w }.
-            each_with_object(Hash.new(0)) { |w, memo| memo[w] += 1 }.
-            sort_by { |k, v| [-v, -k.size] }
+          words = lists.map { |li| li.full_name.split('/')[1] }
+            .select { |n| !n.match(list_exclude_regexp) }
+            .map { |n| n.split('-') }.flatten
+            .delete_if { |w| w.size < 2 || w.match(name_exclude_regexp) }
+            .map { |w| normalize_synonym(w) }
+            .each_with_object(Hash.new(0)) { |w, memo| memo[w] += 1 }
+            .sort_by { |k, v| [-v, -k.size] }
+          words.delete_if { |_, v| v == 1 } if words.select { |_, v| v >= 2 }.any?
 
-          puts "words: #{words.take(10)}" if debug
+          puts "#{words.size} words: #{words.map { |k, v| "#{k} #{v}" }.join(', ')}" if debug
           return {} if words.empty?
 
           # 出現頻度の高い単語を名前に含むリストを抽出
-          _words = []
-          lists =
-            filter(lists, min: 2) do |li, i|
-              _words = words[0..i].map(&:first)
-              name = li.full_name.split('/')[1]
-              _words.any? { |w| name.include?(w) }
+          words.size.times.each do |index|
+            ws = words.take(index + 1).map(&:first)
+            ls = lists.select { |li| ws.any? { |w| li.full_name.split('/')[1].split('-').map { |w| normalize_synonym(w) }.include?(w) } }
+            if ls.size >= 2
+              words = ws
+              lists = ls
+              break
             end
-          puts "lists include #{_words.inspect}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
+          end
+
+          puts "#{lists.size} lists include #{words.inspect}: #{lists.map { |li| li.member_count }.inspect}" if debug
           return {} if lists.empty?
 
           # 中間の 25-75% のリストを抽出
@@ -147,81 +165,57 @@ module TwitterWithAutoPagination
             percentile25 = ((lists.length * 0.25).ceil) - 1
             percentile75 = ((lists.length * 0.75).ceil) - 1
             lists = lists[percentile25..percentile75]
-            puts "lists sliced by 25-75 percentile: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
-          end if shrink || lists.size > shrink_limit
+            puts "#{lists.size} lists sliced by 25-75 percentile: #{lists.size} #{lists.map { |li| li.member_count }.inspect}" if debug
+          end if lists.size > shrink_limit
 
-          # メンバー数がしきい値より少ないリストを抽出
-          _list_member = 0
-          _min_list_member = 10 < lists.size ? 10 : 0
-          _lists =
-            filter(lists, min: 2) do |li, i|
-              _list_member = list_member * (1.0 + 0.25 * i)
-              _min_list_member < li.member_count && li.member_count < _list_member
-            end
-          lists = _lists.empty? ? [lists[0]] : _lists
-          puts "lists limited by list member #{_min_list_member}..#{_list_member.round}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
-          return {} if lists.empty?
-
-          # トータルメンバー数がしきい値より少なくなるリストを抽出
-          _lists = []
-          lists.size.times do |i|
-            _lists = lists[0..(-1 - i)]
-            if _lists.map { |li| li.member_count }.sum < total_member
-              break
-            else
-              _lists = []
-            end
+          # メンバー数がしきい値内に収まるリストを抽出
+          if (ls = lists.select { |li| li.member_count.between?(10, list_member) }).many?
+            lists = ls
+            puts "#{lists.size} lists limited by 10..#{list_member} members: #{lists.map { |li| li.member_count }.inspect}" if debug
           end
-          lists = _lists.empty? ? [lists[0]] : _lists
-          puts "lists limited by total members #{total_member}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
+
+          # トータルメンバー数がしきい値より少なくなるようにリストを抽出
+          while lists.sum { |li| li.member_count } >= total_member
+            index = lists.map(&:member_count).each.with_index.max[1]
+            lists.delete_at(index)
+          end if lists.sum { |li| li.member_count } >= total_member
+
+          puts "#{lists.size} lists limited by total #{total_member} members: #{lists.map { |li| li.member_count }.inspect}" if debug
           return {} if lists.empty?
 
-          # リスト数がしきい値より少なくなるリストを抽出
-          if lists.size > total_list
+          # リスト数がしきい値より少なくなるようにリストを抽出
+          if lists.size >= total_list
             lists = lists[0..(total_list - 1)]
           end
-          puts "lists limited by total lists #{total_list}: #{lists.size} (#{lists.map { |li| li.member_count }.join(', ')})" if debug
-          return {} if lists.empty?
+
+          puts "#{lists.size} lists limited by total #{total_list} lists: #{lists.map { |li| li.member_count }.inspect}" if debug
 
           members = lists.map do |li|
             begin
               list_members(li.id)
             rescue Twitter::Error::NotFound => e
-              puts "#{__method__}: #{e.class} #{e.message} #{li.id} #{li.full_name} #{li.mode}" if debug
+              puts "#{__method__}: #{li.full_name} is not found. #{li.id} #{li.mode}" if debug
               nil
             end
           end.compact.flatten
-          puts "candidate members: #{members.size}" if debug
+
+          puts "#{members.size} candidate members" if debug
           return {} if members.empty?
 
-          open('members.txt', 'w') {|f| f.write members.map{ |m| m.description.gsub(/\R/, ' ') }.join("\n") } if debug
+          File.write('members.txt', members.map{ |m| m.description.gsub(/\R/, ' ') }.join("\n")) if debug
 
-          3.times do
-            _members = members.each_with_object(Hash.new(0)) { |member, memo| memo[member] += 1 }.
-              select { |_, v| lists.size * rate < v }.keys
-            if _members.size > 100
-              members = _members
-              break
-            else
-              rate -= 0.05
-            end
+          # 複数のリストに入っているユーザーのみを抽出
+          uids = members.each_with_object(Hash.new(0)) { |member, memo| memo[member.id.to_i] += 1 }.select { |_, v| v >= 2 }.keys
+          if uids.size >= 100
+            members = uids.map { |uid| members.find { |m| m.id.to_i == uid } }
+            puts "#{members.size} members included by 2 and over lists" if debug
           end
-          puts "members included multi lists #{rate.round(3)}: #{members.size}" if debug
 
-          count_freq_words(members.map { |m| m.description }, special_words: PROFILE_SPECIAL_WORDS, exclude_words: PROFILE_EXCLUDE_WORDS, special_regexp: PROFILE_SPECIAL_REGEXP, exclude_regexp: PROFILE_EXCLUDE_REGEXP, debug: debug).take(limit)
+          texts = members.map { |m| normalize_moji(m.description) }
+          count_freq_words(texts, special_words: PROFILE_SPECIAL_WORDS, exclude_words: PROFILE_EXCLUDE_WORDS, special_regexp: PROFILE_SPECIAL_REGEXP, exclude_regexp: PROFILE_EXCLUDE_REGEXP, debug: debug).take(limit)
         end
 
         private
-
-        def filter(lists, min:)
-          min = [min, lists.size].min
-          _lists = []
-          3.times do |i|
-            _lists = lists.select { |li| yield(li, i) }
-            break if _lists.size >= min
-          end
-          _lists
-        end
 
         def count_by_word(texts, delim: nil, tagger: nil, min_length: 2, max_length: 5, special_words: [], exclude_words: [], special_regexp: nil, exclude_regexp: nil)
           texts = texts.dup
@@ -250,9 +244,10 @@ module TwitterWithAutoPagination
               map { |line| line.split("\t")[0] }
           end
 
-          texts.delete_if { |w| w.empty? || w.size < min_length || max_length < w.size || exclude_words.include?(w) || w.match(/\d{2}/) }.
-            each_with_object(frequency) { |word, memo| memo[word] += 1 }.
-            sort_by { |k, v| [-v, -k.size] }.to_h
+          texts.delete_if { |w| w.empty? || w.size < min_length || max_length < w.size || exclude_words.include?(w) || w.match(/\d{2}/) }
+            .map { |w| normalize_synonym(w) }
+            .each_with_object(frequency) { |word, memo| memo[word] += 1 }
+            .sort_by { |k, v| [-v, -k.size] }.to_h
         end
 
         def count_freq_words(texts, special_words: [], exclude_words: [], special_regexp: nil, exclude_regexp: nil, debug: false)
@@ -287,28 +282,121 @@ module TwitterWithAutoPagination
           tweet.entities.hashtags.map { |h| h.text }
         end
 
-        SYNONYM_WORDS = (
-          %w(cosplay cosplayer cosplayers coser cos こすぷれ コスプレ レイヤ レイヤー コスプレイヤー レイヤーさん).map { |w| [w, 'coplay'] } +
-          %w(tsukuba tkb).map { |w| [w, 'tsukuba'] } +
-          %w(waseda 早稲田 早稲田大学).map { |w| [w, 'waseda'] } +
-          %w(keio 慶應 慶應義塾).map { |w| [w, 'keio'] } +
-          %w(gakusai gakuensai 学祭 学園祭).map { |w| [w, 'gakusai'] } +
-          %w(kosen kousen).map { |w| [w, 'kosen'] } +
-          %w(anime アニメ).map { |w| [w, 'anime'] } +
-          %w(photo photos).map { |w| [w, 'photo'] } +
-          %w(creator creater クリエイター).map { |w| [w, 'creator'] } +
-          %w(illustrator illustrater 絵師).map { |w| [w, 'illustrator'] } +
-          %w(artist art artists アート 芸術).map { |w| [w, 'artist'] } +
-          %w(design デザイン).map { |w| [w, 'design'] } +
-          %w(kawaii かわいい).map { |w| [w, 'kawaii'] } +
-          %w(idol あいどる アイドル 美人).map { |w| [w, 'idol'] } +
-          %w(music musician musicians dj netlabel label レーベル おんがく 音楽家 音楽).map { |w| [w, 'music'] } +
-          %w(engineer engineers engineering えんじにあ tech 技術 技術系 hacker coder programming programer programmer geek rubyist ruby scala java lisp).map { |w| [w, 'engineer'] } +
-          %w(internet インターネット).map { |w| [w, 'internet'] }
-        ).to_h
+        SYNONYM_WORDS = [
+          %w(役者 actress 劇団 舞台),
+          %w(アート art artist artists arts 芸術 アーティスト クリエイター),
+          %w(av女優 av),
+          %w(セレブ celebrity celeb celebs),
+          %w(コスプレ cos coser cosplay cosplayer cosplayers コス レイヤー レイヤーさん),
+          %w(カルチャー culture),
+          %w(ファッション fashion),
+          %w(グラビア gravure model models モデル),
+          %w(アイドル idol あいどる),
+          %w(かわいい kawaii cute),
+          %w(音楽 music msc musician musicians ongaku おんがく 音楽家),
+          %w(作曲 楽曲),
+          %w(サッカー soccer),
+          %w(浦和 浦和レッズ),
+          %w(写真 photos photo camera カメラ),
+          %w(写真集 撮影会),
+          %w(タレント talent talents),
+          %w(サブカル subcul subculture),
+          %w(アニメ anison anime),
+          %w(クリエイター creater creator creators creaters creative),
+          %w(DJ club dj djs trackmaker),
+          %w(デザイン design designer designers),
+          %w(レーベル label netlabel),
+          %w(企業 company companies 企業),
+          %w(ビジネス business economy economics bijinesu biz buisiness businesses keizai 経済),
+          %w(投資 金融 相場 ETF 資産 投信 長期投資 投資信託 トレーダー トレード),
+          %w(ニュース news journal media メディア 記事 新聞),
+          %w(芸能人 famous 有名人 著名人),
+          %w(政治 gov government gyousei 政治家),
+          %w(行政 gyousei 自治体 地方自治体),
+          %w(公式 official officials オフィシャル),
+          %w(芸能 entertainment geinou),
+          %w(エンジニア engineer engineering programmer developer developers hacker coder programming programer programmer geek rubyist ruby scala java lisp),
+          %w(高専 kosen kousen kosenconf),
+          %w(趣味 hobby),
+          %w(ゲーム game),
+          %w(つくば tkb tsukuba),
+          %w(アカデミック academic academics academia),
+          %w(ブロガー blog bloger blogger bloggers),
+          %w(書籍 book books),
+          %w(大学 education edu gakusei student students circle colleges daigaku 短大),
+          %w(学園祭 gakuensai gakusai 学祭),
+          %w(慶應 keio 慶應sfc 慶應義塾 慶應義塾大学),
+          %w(早稲田 waseda 早稲田大学),
+          %w(東大 todai toudai 東京大学),
+          %w(美大 bidai geidai musabi tamabi タマビ ムサビ 多摩美),
+          %w(大学公式 大学関係 大学関連 大学関連アカウント 大学広報 大学広報（公式・非公式）),
+          %w(学校関係 school schools 学校),
+          %w(研究 research researcher study 研究者),
+          %w(起業家 entrepreneur entrepreneurs venture startup startups ceo executive スタートアップ 社長 経営 経営者),
+          %w(ファイナンス finance founders),
+          %w(茨城 ibaragi ibaraki ibrk),
+          %w(インフルエンサー influence influencer influencers influential),
+          %w(インフォメーション info infomation information informations),
+          %w(アイデア idea innovation inspiring),
+          %w(アップル apple ios ipad iphone),
+          %w(地震 earthquake jishin),
+          %w(リーダー leader leaders),
+          %w(ライフライン life lifeline saigai shinsai sinsai 防災 震災),
+          %w(ローカルニュース local localnews),
+          %w(マネジメント management manager),
+          %w(メイカー make maker),
+          %w(医療 medical),
+          %w(映画 movie),
+          %w(美術館 museum),
+          %w(ショッピング shop shopping shops store),
+          %w(WEB web web系),
+          %w(インターネット internet),
+          %w(観光 travel),
+          %w(絵師 illustrator illustrater イラスト),
+        ]
 
-        def normalize_synonym(words)
-          words.map { |w| SYNONYM_WORDS.has_key?(w) ? SYNONYM_WORDS[w] : w }
+        def normalize_synonym(word)
+          synonym = word
+          SYNONYM_WORDS.each do |dic|
+            if dic.include? word
+              synonym = dic[0]
+              break
+            end
+          end
+          synonym
+        end
+
+        require 'moji'
+
+        def normalize_moji(norm)
+          norm.tr!("０-９Ａ-Ｚａ-ｚ", "0-9A-Za-z")
+          norm = Moji.han_to_zen(norm, Moji::HAN_KATA)
+          hypon_reg = /(?:˗|֊|‐|‑|‒|–|⁃|⁻|₋|−)/
+          norm.gsub!(hypon_reg, "-")
+          choon_reg = /(?:﹣|－|ｰ|—|―|─|━)/
+          norm.gsub!(choon_reg, "ー")
+          chil_reg = /(?:~|∼|∾|〜|〰|～)/
+          norm.gsub!(chil_reg, '')
+          norm.gsub!(/[ー]+/, "ー")
+          norm.tr!(%q{!"#$%&'()*+,-.\/:;<=>?@[¥]^_`{|}~｡､･｢｣"}, %q{！”＃＄％＆’（）＊＋，－．／：；＜＝＞？＠［￥］＾＿｀｛｜｝〜。、・「」})
+          norm.gsub!(/　/, " ")
+          norm.gsub!(/ {1,}/, " ")
+          norm.gsub!(/^[ ]+(.+?)$/, "\\1")
+          norm.gsub!(/^(.+?)[ ]+$/, "\\1")
+          while norm =~ %r{([\p{InCjkUnifiedIdeographs}\p{InHiragana}\p{InKatakana}\p{InHalfwidthAndFullwidthForms}\p{InCJKSymbolsAndPunctuation}]+?)[ ]{1}([\p{InCjkUnifiedIdeographs}\p{InHiragana}\p{InKatakana}\p{InHalfwidthAndFullwidthForms}\p{InCJKSymbolsAndPunctuation}]+?)}
+            norm.gsub!( %r{([\p{InCJKUnifiedIdeographs}\p{InHiragana}\p{InKatakana}\p{InHalfwidthAndFullwidthForms}\p{InCJKSymbolsAndPunctuation}]+?)[ ]{1}([\p{InCJKUnifiedIdeographs}\p{InHiragana}\p{InKatakana}\p{InHalfwidthAndFullwidthForms}\p{InCJKSymbolsAndPunctuation}]+?)}, "\\1\\2")
+          end
+          while norm =~ %r{([\p{InBasicLatin}]+)[ ]{1}([\p{InCJKUnifiedIdeographs}\p{InHiragana}\p{InKatakana}\p{InHalfwidthAndFullwidthForms}\p{InCJKSymbolsAndPunctuation}]+)}
+            norm.gsub!(%r{([\p{InBasicLatin}]+)[ ]{1}([\p{InCJKUnifiedIdeographs}\p{InHiragana}\p{InKatakana}\p{InHalfwidthAndFullwidthForms}\p{InCJKSymbolsAndPunctuation}]+)}, "\\1\\2")
+          end
+          while norm =~ %r{([\p{InCJKUnifiedIdeographs}\p{InHiragana}\p{InKatakana}\p{InHalfwidthAndFullwidthForms}\p{InCJKSymbolsAndPunctuation}]+)[ ]{1}([\p{InBasicLatin}]+)}
+            norm.gsub!(%r{([\p{InCJKUnifiedIdeographs}\p{InHiragana}\p{InKatakana}\p{InHalfwidthAndFullwidthForms}\p{InCJKSymbolsAndPunctuation}]+)[ ]{1}([\p{InBasicLatin}]+)}, "\\1\\2")
+          end
+          norm.tr!(
+              %q{！”＃＄％＆’（）＊＋，－．／：；＜＞？＠［￥］＾＿｀｛｜｝〜},
+              %q{!"#$%&'()*+,-.\/:;<>?@[¥]^_`{|}~}
+          )
+          norm
         end
       end
     end
