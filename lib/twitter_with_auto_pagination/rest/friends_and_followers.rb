@@ -5,93 +5,56 @@ module TwitterWithAutoPagination
     module FriendsAndFollowers
       include TwitterWithAutoPagination::REST::Utils
 
-      def friendship?(*args)
-        options = args.extract_options!
-        instrument(__method__, nil, options) do
-          fetch_cache_or_call_api(__method__, args) do
-            call_api(method(__method__).super_method, *args, options)
+      def friendship?(from, to, options = {})
+        twitter.send(__method__, from, to, options)
+      end
+
+      MAX_IDS_PER_REQUEST = 5000
+
+      %i(friend_ids follower_ids).each do |name|
+        define_method(name) do |*args|
+          options = {count: MAX_IDS_PER_REQUEST, cursor: -1}.merge(args.extract_options!)
+
+          collect_with_cursor do |next_cursor|
+            options[:next_cursor] = next_cursor unless next_cursor.nil?
+            twitter.send(name, *args, options)
           end
         end
       end
 
-      def friend_ids(*args)
-        options = {count: 5000, cursor: -1}.merge(args.extract_options!)
-        args[0] = verify_credentials(super_operation: __method__).id if args.empty?
-        instrument(__method__, nil, options) do
-          fetch_cache_or_call_api(__method__, args[0], options) do
-            collect_with_cursor(method(__method__).super_method, *args, options)
-          end
-        end
-      end
-
-      def follower_ids(*args)
-        options = {count: 5000, cursor: -1}.merge(args.extract_options!)
-        args[0] = verify_credentials(super_operation: __method__).id if args.empty?
-        instrument(__method__, nil, options) do
-          fetch_cache_or_call_api(__method__, args[0], options) do
-            collect_with_cursor(method(__method__).super_method, *args, options)
-          end
-        end
-      end
-
-      # specify reduce: false to use tweet for inactive_*
       def friends(*args)
-        options = args.extract_options!
-        instrument(__method__, nil, options) do
-          if options.delete(:serial)
-            _friends_serially(*args, options)
-          else
-            _friends_parallelly(*args, options)
-          end
-        end
+        options = args.extract_options!.merge(super_operation: :friends)
+        ids = friend_ids(*args, options)
+        users_internal(ids, options)
       end
 
-      def _friends_serially(*args)
-        options = {count: 200, include_user_entities: true, cursor: -1, super_operation: :friends}.merge(args.extract_options!)
-        args[0] = verify_credentials(super_operation: __method__).id if args.empty?
-        instrument(__method__, nil, options) do
-          fetch_cache_or_call_api(:friends, args[0], options) do
-            collect_with_cursor(method(:friends).super_method, *args, options).map { |u| u.to_hash }
-          end
-        end
-      end
-
-      def _friends_parallelly(*args)
-        options = args.extract_options!
-        instrument(__method__, nil, {super_operation: :friends}.merge(options)) do
-          opt = {super_operation: __method__}.merge(options)
-          users(friend_ids(*args, opt).map { |id| id.to_i }, opt)
-        end
-      end
-
-      # specify reduce: false to use tweet for inactive_*
       def followers(*args)
-        options = args.extract_options!
-        instrument(__method__, nil, options) do
-          if options.delete(:serial)
-            _followers_serially(*args, options)
-          else
-            _followers_parallelly(*args, options)
-          end
+        options = args.extract_options!.merge(super_operation: :followers)
+        ids = follower_ids(*args, options)
+        users_internal(ids, options)
+      end
+
+      def friend_ids_and_follower_ids(*args)
+        options = args.extract_options!.merge(super_operation: :friend_ids_and_follower_ids)
+
+        parallel(in_threads: 2) do |batch|
+          batch.friend_ids(*args, options)
+          batch.follower_ids(*args, options)
         end
       end
 
-      def _followers_serially(*args)
-        options = {count: 200, include_user_entities: true, cursor: -1, super_operation: :followers}.merge(args.extract_options!)
-        args[0] = verify_credentials(super_operation: __method__).id if args.empty?
-        instrument(__method__, nil, options) do
-          fetch_cache_or_call_api(:followers, args[0], options) do
-            collect_with_cursor(method(:followers).super_method, *args, options).map { |u| u.to_hash }
-          end
-        end
-      end
+      def friends_and_followers(*args)
+        options = args.extract_options!.merge(super_operation: :friends_and_followers)
 
-      def _followers_parallelly(*args)
-        options = args.extract_options!
-        instrument(__method__, nil, {super_operation: :followers}.merge(options)) do
-          opt = {super_operation: __method__}.merge(options)
-          users(follower_ids(*args, opt).map { |id| id.to_i }, opt)
-        end
+        following_ids, followed_ids = friend_ids_and_follower_ids(*args, options)
+        unique_ids = (following_ids + followed_ids).uniq
+        people = users_internal(unique_ids).index_by { |u| u[:id] }
+        [people.slice(*following_ids), people.slice(*followed_ids)]
+
+        # parallel(in_threads: 2) do |batch|
+        #   batch.friends(*args, options)
+        #   batch.followers(*args, options)
+        # end
       end
     end
   end

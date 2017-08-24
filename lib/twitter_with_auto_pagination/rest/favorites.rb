@@ -5,13 +5,19 @@ module TwitterWithAutoPagination
     module Favorites
       include TwitterWithAutoPagination::REST::Utils
 
-      def favorites(*args)
-        options = {count: 100, call_limit: 3}.merge(args.extract_options!)
-        args[0] = verify_credentials(super_operation: __method__).id if args.empty?
-        instrument(__method__, nil, options) do
-          fetch_cache_or_call_api(__method__, args[0], options) do
-            collect_with_max_id(method(__method__).super_method, *args, options).map { |s| s.attrs }
-          end
+      MAX_TWEETS_PER_REQUEST = 100
+
+      %i(favorites).each do |name|
+        define_method(name) do |*args|
+          options = args.extract_options!
+          call_limit = calc_call_limit(options.delete(:count), MAX_TWEETS_PER_REQUEST)
+          options = {count: MAX_TWEETS_PER_REQUEST, result_type: :recent, call_count: 0, call_limit: call_limit}.merge(options)
+
+          collect_with_max_id do |max_id|
+            options[:max_id] = max_id unless max_id.nil?
+            options[:call_count] += 1
+            twitter.send(name, *args, options) if options[:call_count] <= options[:call_limit]
+          end.map(&:attrs)
         end
       end
     end

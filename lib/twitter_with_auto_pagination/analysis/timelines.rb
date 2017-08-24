@@ -1,8 +1,8 @@
 require 'twitter_with_auto_pagination/rest/utils'
 
 module TwitterWithAutoPagination
-  module REST
-    module Uncategorized
+  module Analysis
+    module Timelines
       include TwitterWithAutoPagination::REST::Utils
 
       EVERY_DAY = (0..6)

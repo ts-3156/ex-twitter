@@ -17,13 +17,6 @@ module TwitterWithAutoPagination
           result
         end
 
-        def friends_and_followers(*args)
-          _fetch_parallelly(
-            [
-              {method: :friends, args: args},
-              {method: :followers, args: args}])
-        end
-
         def friends_followers_and_statuses(*args)
           _fetch_parallelly(
             [

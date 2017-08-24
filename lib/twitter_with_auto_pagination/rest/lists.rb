@@ -5,22 +5,23 @@ module TwitterWithAutoPagination
     module Lists
       include TwitterWithAutoPagination::REST::Utils
 
+      # Returns the lists the specified user has been added to.
       def memberships(*args)
         options = {count: 1000, cursor: -1}.merge(args.extract_options!)
-        args[0] = verify_credentials(super_operation: __method__).id if args.empty?
-        instrument(__method__, nil, options) do
-          fetch_cache_or_call_api(__method__, args[0], options) do
-            collect_with_cursor(method(__method__).super_method, *args, options)
-          end
+
+        collect_with_cursor do |next_cursor|
+          options[:next_cursor] = next_cursor unless next_cursor.nil?
+          twitter.send(:memberships, *args, options)
         end
       end
 
+      # Returns the members of the specified list.
       def list_members(*args)
         options = {count: 5000, skip_status: 1, cursor: -1}.merge(args.extract_options!)
-        instrument(__method__, nil, options) do
-          fetch_cache_or_call_api(__method__, args[0], options) do
-            collect_with_cursor(method(__method__).super_method, *args, options)
-          end
+
+        collect_with_cursor do |next_cursor|
+          options[:next_cursor] = next_cursor unless next_cursor.nil?
+          twitter.send(:list_members, *args, options)
         end
       end
     end
