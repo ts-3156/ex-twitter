@@ -5,34 +5,21 @@ module TwitterWithAutoPagination
     module Timelines
       include TwitterWithAutoPagination::REST::Utils
 
-      def home_timeline(*args)
-        mtd = __method__
-        options = {count: 200, include_rts: true, call_limit: 3}.merge(args.extract_options!)
-        instrument(mtd, nil, options) do
-          fetch_cache_or_call_api(mtd, verify_credentials(super_operation: mtd).id, options) do
-            collect_with_max_id(method(mtd).super_method, options).map { |s| s.attrs }
-          end
-        end
-      end
+      MAX_TWEETS_PER_REQUEST = 200
 
-      def user_timeline(*args)
-        mtd = __method__
-        options = {count: 200, include_rts: true, call_limit: 3}.merge(args.extract_options!)
-        args[0] = verify_credentials(super_operation: mtd).id if args.empty?
-        instrument(mtd, nil, options) do
-          fetch_cache_or_call_api(mtd, args[0], options) do
-            collect_with_max_id(method(mtd).super_method, *args, options).map { |s| s.attrs }
-          end
-        end
-      end
+      %i(home_timeline user_timeline mentions_timeline).each do |name|
+        define_method(name) do |*args|
+          options = args.extract_options!.dup
+          call_limit = calc_call_limit(options.delete(:count), MAX_TWEETS_PER_REQUEST)
+          options = {count: MAX_TWEETS_PER_REQUEST, include_rts: true, call_count: 0, call_limit: call_limit}.merge(options)
 
-      def mentions_timeline(*args)
-        mtd = __method__
-        options = {count: 200, include_rts: true, call_limit: 1}.merge(args.extract_options!)
-        instrument(mtd, nil, options) do
-          fetch_cache_or_call_api(mtd, verify_credentials(super_operation: mtd).id, options) do
-            collect_with_max_id(method(mtd).super_method, options).map { |s| s.attrs }
-          end
+          collect_with_max_id do |max_id|
+            options[:max_id] = max_id unless max_id.nil?
+            options[:call_count] += 1
+            if options[:call_count] <= options[:call_limit]
+              twitter.send(name, *args, options)
+            end
+          end.map(&:attrs)
         end
       end
     end

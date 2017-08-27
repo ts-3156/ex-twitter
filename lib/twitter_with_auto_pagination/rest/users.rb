@@ -6,56 +6,43 @@ module TwitterWithAutoPagination
     module Users
       include TwitterWithAutoPagination::REST::Utils
 
-      def verify_credentials(*args)
-        options = {skip_status: true}.merge(args.extract_options!)
-        instrument(__method__, nil, options) do
-          fetch_cache_or_call_api(__method__, args) do
-            call_api(method(__method__).super_method, *args, options).to_hash
-          end
-        end
+      def verify_credentials(options = {})
+        twitter.send(__method__, {skip_status: true}.merge(options)).to_hash
       end
 
       def user?(*args)
-        options = args.extract_options!
-        return false if args.empty? || args[0].nil? || !args[0].to_s.match(/\A([a-zA-Z0-9_]{1,20}|[1-9][0-9]*)\z/)
-        instrument(__method__, nil, options) do
-          fetch_cache_or_call_api(__method__, args[0], options) do
-            call_api(method(__method__).super_method, *args, options)
-          end
-        end
+        twitter.send(__method__, *args)
       end
 
       def user(*args)
-        options = args.extract_options!
-        args[0] = verify_credentials(super_operation: __method__).id if args.empty?
-        instrument(__method__, nil, options) do
-          fetch_cache_or_call_api(__method__, args[0], options) do
-            call_api(method(__method__).super_method, *args, options).to_hash
-          end
-        end
+        twitter.send(__method__, *args).to_hash
       end
 
-      # use compact, not use sort and uniq
-      # specify reduce: false to use tweet for inactive_*
-      # TODO Perhaps `old_users` automatically merges result...
-      def users(*args)
-        options = args.extract_options!
-        options[:reduce] = false
-        users_per_workers = args.first.compact.each_slice(100).to_a
-        processed_users = []
-        thread_size = [users_per_workers.size, 10].min
+      MAX_USERS_PER_REQUEST = 100
 
-        instrument(__method__, nil, options) do
-          Parallel.each_with_index(users_per_workers, in_threads: thread_size) do |users_per_worker, i|
-            _users = fetch_cache_or_call_api(__method__, users_per_worker, options) do
-              call_api(method(__method__).super_method, users_per_worker, options).map { |u| u.to_hash }
-            end
-
-            processed_users << {i: i, users: _users}
-          end
+      # client.users         -> cached
+      # users(internal call) -> cached
+      # super                -> not cached
+      def users(values, options = {})
+        if values.size <= MAX_USERS_PER_REQUEST
+          return twitter.send(__method__, *values, options).map(&:to_hash)
         end
 
-        processed_users.sort_by { |p| p[:i] }.map { |p| p[:users] }.flatten.compact
+        users_internal(values, options)
+      end
+
+      def blocked_ids(*args)
+        twitter.send(__method__, *args).attrs[:ids]
+      end
+
+      private
+
+      def users_internal(values, options = {})
+        options = options.merge(super_operation: :users)
+
+        parallel(in_threads: 10) do |batch|
+          values.each_slice(MAX_USERS_PER_REQUEST) { |targets| batch.users(targets, options) }
+        end.flatten
       end
     end
   end

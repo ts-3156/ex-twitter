@@ -7,6 +7,7 @@ gem 'mecab'
 
 group :development do
   gem 'pry'
+  gem 'dotenv'
 end
 
 group :test do
