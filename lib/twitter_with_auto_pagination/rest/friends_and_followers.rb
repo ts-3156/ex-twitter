@@ -49,7 +49,7 @@ module TwitterWithAutoPagination
         following_ids, followed_ids = friend_ids_and_follower_ids(*args, options)
         unique_ids = (following_ids + followed_ids).uniq
         people = users_internal(unique_ids).index_by { |u| u[:id] }
-        [people.slice(*following_ids), people.slice(*followed_ids)]
+        [people.slice(*following_ids).values, people.slice(*followed_ids).values]
 
         # parallel(in_threads: 2) do |batch|
         #   batch.friends(*args, options)
