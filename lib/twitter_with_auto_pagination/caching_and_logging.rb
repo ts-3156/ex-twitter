@@ -64,17 +64,6 @@ module TwitterWithAutoPagination
       def cache_disabled?(options)
         options.is_a?(Hash) && options.has_key?(:cache) && !options[:cache]
       end
-
-      def to_mash(obj)
-        case
-          when obj.kind_of?(Array)
-            obj.map {|o| to_mash(o)}
-          when obj.kind_of?(Hash)
-            Hashie::Mash.new(obj.map {|k, v| [k, to_mash(v)]}.to_h)
-          else
-            obj
-        end
-      end
     end
   end
 end

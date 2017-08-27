@@ -51,7 +51,7 @@ module TwitterWithAutoPagination
       debug { "#{name}#{" #{truncated_payload(payload)}" unless payload.empty?}" }
     end
 
-    %w(request encode decode to_mash).each do |operation|
+    %w(request encode decode).each do |operation|
       class_eval <<-METHOD, __FILE__, __LINE__ + 1
         def #{operation}(event)
           event.payload[:name] = '#{operation}'

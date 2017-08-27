@@ -1,4 +1,3 @@
-require 'hashie'
 require 'digest/md5'
 
 require 'twitter_with_auto_pagination/collector'

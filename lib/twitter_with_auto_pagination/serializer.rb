@@ -3,7 +3,7 @@ module TwitterWithAutoPagination
     class << self
       def encode(obj, options = {})
         instrument(options) do
-          (!!obj == obj) ? obj : coder.dump(obj)
+          (!!obj == obj) ? obj : coder.encode(obj)
         end
       end
 

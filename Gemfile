@@ -2,7 +2,6 @@ source 'https://rubygems.org'
 
 gem 'rake'
 gem 'activesupport'
-gem 'hashie'
 gem 'mecab'
 
 group :development do
