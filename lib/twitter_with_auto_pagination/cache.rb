@@ -7,13 +7,11 @@ module TwitterWithAutoPagination
   class Cache
     extend Forwardable
 
-    attr_reader :serializer, :client
+    attr_reader :client
 
     def_delegators :@client, :clear, :cleanup
 
     def initialize
-      @serializer = Serializer
-
       path = File.join('tmp', 'twitter_cache')
       Dir.mkdir(path) unless File.exists?(path)
       @client = ActiveSupport::Cache::FileStore.new(path, expires_in: 1.hour, race_condition_ttl: 5.minutes)
@@ -26,10 +24,10 @@ module TwitterWithAutoPagination
       fetch_result =
         @client.fetch(key) do
           block_result = yield
-          serializer.encode(block_result, args: options[:args])
+          Serializer.encode(block_result, args: options[:args])
         end
 
-      block_result ? block_result : serializer.decode(fetch_result, args: options[:args])
+      block_result ? block_result : Serializer.decode(fetch_result, args: options[:args])
     end
 
     private

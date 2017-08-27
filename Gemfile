@@ -8,6 +8,7 @@ gem 'mecab'
 group :development do
   gem 'pry'
   gem 'dotenv'
+  gem 'oj', require: false
 end
 
 group :test do

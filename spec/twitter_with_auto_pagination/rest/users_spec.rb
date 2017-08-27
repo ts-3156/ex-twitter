@@ -113,7 +113,6 @@ describe TwitterWithAutoPagination::REST::Users do
     it_behaves_like 'cache: false is specified'
     it_behaves_like 'when options are changed'
     it_behaves_like 'when a client is changed, it does not share a cache'
-    it_behaves_like 'when one param is specified, it raises an exception'
 
     context 'when strange params are specified' do
       let(:params) { [1, 2, 3] }
