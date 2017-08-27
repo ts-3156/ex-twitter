@@ -58,6 +58,10 @@ describe TwitterWithAutoPagination::REST::FriendsAndFollowers do
   describe '#friend_ids' do
     let(:name) { :friend_ids }
 
+    it 'matches original one' do
+      expect(client.friend_ids).to match_twitter(client.twitter.friend_ids.attrs[:ids])
+    end
+
     context 'with one param' do
       let(:params) { [id] }
       let(:params2) { [id2] }
@@ -87,6 +91,10 @@ describe TwitterWithAutoPagination::REST::FriendsAndFollowers do
 
   describe '#follower_ids' do
     let(:name) { :follower_ids }
+
+    it 'matches original one' do
+      expect(client.follower_ids).to match_twitter(client.twitter.follower_ids.attrs[:ids])
+    end
 
     context 'with one param' do
       let(:params) { [id] }
@@ -149,13 +157,21 @@ describe TwitterWithAutoPagination::REST::FriendsAndFollowers do
     it 'calls #friend_ids_and_follower_ids with unique ids' do
       expect(client).to receive(:friend_ids_and_follower_ids).with(id, any_args).and_return([[id], [id]])
       allow(client).to receive(:users_internal).with([id], any_args).and_return([{id: id}])
-      client.friends_and_followers(id)
+
+      friends, followers = client.friends_and_followers(id)
+
+      expect(friends).to match_twitter([{id: id}])
+      expect(followers).to match_twitter([{id: id}])
     end
 
     it 'calls #users_internal with unique ids' do
       allow(client).to receive(:friend_ids_and_follower_ids).with(id, any_args).and_return([[id], [id]])
       expect(client).to receive(:users_internal).with([id], any_args).and_return([{id: id}])
-      client.friends_and_followers(id)
+
+      friends, followers = client.friends_and_followers(id)
+
+      expect(friends).to match_twitter([{id: id}])
+      expect(followers).to match_twitter([{id: id}])
     end
   end
 end
