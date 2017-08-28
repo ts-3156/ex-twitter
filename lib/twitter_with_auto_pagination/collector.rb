@@ -11,7 +11,9 @@ module TwitterWithAutoPagination
     def collect_with_cursor(collection = [], cursor = nil, &block)
       response = yield(cursor)
       return collection if response.nil?
-      collection += (response.attrs[:ids] || response.attrs[:users] || response.attrs[:lists]) # TODO to_a
+
+      # Notice: If you call response.to_a, it automatically fetch all results and the results are not cached.
+      collection += (response.attrs[:ids] || response.attrs[:users] || response.attrs[:lists])
       response.attrs[:next_cursor].zero? ? collection.flatten : collect_with_cursor(collection, response.attrs[:next_cursor], &block)
     end
   end
