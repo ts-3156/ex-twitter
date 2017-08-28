@@ -19,6 +19,15 @@ describe TwitterWithAutoPagination::REST::FriendsAndFollowers do
     }
   end
 
+  let(:config3) do
+    {
+      consumer_key: ENV['CK3'],
+      consumer_secret: ENV['CS3'],
+      access_token: ENV['AT3'],
+      access_token_secret: ENV['ATS3']
+    }
+  end
+
   let(:client) { TwitterWithAutoPagination::Client.new(config) }
   let(:client2) { TwitterWithAutoPagination::Client.new(config2) }
 
@@ -28,7 +37,7 @@ describe TwitterWithAutoPagination::REST::FriendsAndFollowers do
   before do
     client.cache.clear
     client.twitter.send(:user_id) # Call verify_credentials
-    client2.twitter.send(:user_id) # Call verify_credentials
+    client2.twitter.send(:user_id)
     $fetch_called = $request_called = false
     $fetch_count = $request_count = 0
   end
@@ -94,6 +103,23 @@ describe TwitterWithAutoPagination::REST::FriendsAndFollowers do
 
     it 'matches original one' do
       expect(client.follower_ids).to match_twitter(client.twitter.follower_ids.attrs[:ids])
+    end
+
+    context 'a user who has too many followers is specified' do
+      let(:client) { TwitterWithAutoPagination::Client.new(config3) }
+      let(:id) { 187385226 }
+      let!(:followers_count) { client.user(id)[:followers_count] }
+
+      before do
+        client.twitter.send(:user_id)
+        $fetch_called = $request_called = false
+        $fetch_count = $request_count = 0
+      end
+
+      it 'automatically fetches all followers' do
+        request_count = followers_count / 5000 + (followers_count % 5000 == 0 ? 0 : 1)
+        expect { client.follower_ids(id) }.to fetch & request.exactly(request_count).times
+      end
     end
 
     context 'with one param' do

@@ -10,7 +10,7 @@ module TwitterWithAutoPagination
         options = {count: 1000, cursor: -1}.merge(args.extract_options!)
 
         collect_with_cursor do |next_cursor|
-          options[:next_cursor] = next_cursor unless next_cursor.nil?
+          options[:cursor] = next_cursor unless next_cursor.nil?
           twitter.send(:memberships, *args, options)
         end
       end
@@ -20,7 +20,7 @@ module TwitterWithAutoPagination
         options = {count: 5000, skip_status: 1, cursor: -1}.merge(args.extract_options!)
 
         collect_with_cursor do |next_cursor|
-          options[:next_cursor] = next_cursor unless next_cursor.nil?
+          options[:cursor] = next_cursor unless next_cursor.nil?
           twitter.send(:list_members, *args, options)
         end
       end
