@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 
 gem 'rake'
-gem 'activesupport'
+gem 'activesupport', '< 5.0.0'
 gem 'mecab'
 
 group :development do
