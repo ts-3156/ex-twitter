@@ -11,8 +11,10 @@ module TwitterWithAutoPagination
 
     def_delegators :@client, :clear, :cleanup
 
-    def initialize
-      path = File.join('tmp', 'twitter_cache')
+    def initialize(*args)
+      options = args.extract_options!
+
+      path = options['cache_dir'] || options[:cache_dir] || File.join('tmp', 'twitter_cache')
       Dir.mkdir(path) unless File.exists?(path)
       @client = ActiveSupport::Cache::FileStore.new(path, expires_in: 1.hour, race_condition_ttl: 5.minutes)
     end
