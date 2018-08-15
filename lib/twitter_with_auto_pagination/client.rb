@@ -24,7 +24,7 @@ module TwitterWithAutoPagination
     def initialize(*args)
       options = args.extract_options!
 
-      @cache = TwitterWithAutoPagination::Cache.new
+      @cache = TwitterWithAutoPagination::Cache.new(options)
       Logging.logger = logger = TwitterWithAutoPagination::Logger.new(options)
 
       unless subscriber_attached?
