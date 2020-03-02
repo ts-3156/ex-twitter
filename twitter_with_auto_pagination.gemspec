@@ -2,7 +2,7 @@ lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
-  spec.add_dependency 'twitter', '~> 6.2.0'
+  spec.add_dependency 'twitter'
   spec.add_dependency 'activesupport'
   spec.add_dependency 'parallel'
 
@@ -21,5 +21,5 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = '>= 2.3'
   spec.summary = spec.description
   spec.test_files = Dir.glob('spec/**/*')
-  spec.version = '0.10.0'
+  spec.version = '0.11.0'
 end
