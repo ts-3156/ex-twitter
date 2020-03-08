@@ -1,6 +1,7 @@
 module TwitterWithAutoPagination
   module RateLimit
     def rate_limit
+      puts '#rate_limit is deprecated.'
       RateLimit.new(perform_get('/1.1/application/rate_limit_status.json')) rescue nil
     end
 
