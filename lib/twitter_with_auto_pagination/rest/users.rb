@@ -39,10 +39,15 @@ module TwitterWithAutoPagination
 
       def users_internal(values, options = {})
         options = options.merge(super_operation: :users)
+        threads = options.delete(:threads) || 5
 
-        parallel(in_threads: 10) do |batch|
-          values.each_slice(MAX_USERS_PER_REQUEST) { |targets| batch.users(targets, options) }
-        end.flatten
+        if threads > 1
+          parallel(in_threads: threads) do |batch|
+            values.each_slice(MAX_USERS_PER_REQUEST) { |targets| batch.users(targets, options) }
+          end.flatten
+        else
+          values.each_slice(MAX_USERS_PER_REQUEST).map { |targets| users(targets, options) }.flatten
+        end
       end
     end
   end
