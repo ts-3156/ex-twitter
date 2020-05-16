@@ -14,10 +14,14 @@ module TwitterWithAutoPagination
     def initialize(*args)
       options = args.extract_options!
 
-      path = options['cache_dir'] || options[:cache_dir] || File.join('tmp', 'twitter_cache')
-      ttl = options['cache_ttl'] || options[:cache_ttl] || 1.hour
-      Dir.mkdir(path) unless File.exists?(path)
-      @client = ActiveSupport::Cache::FileStore.new(path, expires_in: ttl, race_condition_ttl: 5.minutes)
+      if options['cache_store']
+        @client = options['cache_store']
+      else
+        path = options['cache_dir'] || options[:cache_dir] || File.join('tmp', 'twitter_cache')
+        ttl = options['cache_ttl'] || options[:cache_ttl] || 1.hour
+        Dir.mkdir(path) unless File.exists?(path)
+        @client = ActiveSupport::Cache::FileStore.new(path, expires_in: ttl, race_condition_ttl: 5.minutes)
+      end
     end
 
     def fetch(method, user, options = {}, &block)
